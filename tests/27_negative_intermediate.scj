@@ -1,0 +1,6 @@
+// Test 27: Negative intermediate results
+let a = 5
+let b = 10
+let c = a - b
+let d = c * 2
+println(d)

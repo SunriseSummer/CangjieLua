@@ -1,0 +1,8 @@
+// Test 75: Simple function
+func simple() {
+    return 42.0
+}
+
+let x = simple()
+println(x)
+// Expected: 42.0

@@ -1,0 +1,6 @@
+// Test 60: Simple ADD
+let a = 5.0
+let b = 0.0
+let c = a + b
+println(c)
+// Expected: 5.0

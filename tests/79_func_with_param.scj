@@ -1,0 +1,7 @@
+// Test 79: Function with parameter
+func double(x) {
+    return x * 2.0
+}
+let result = double(5.0)
+println(result)
+// Expected: 10.0

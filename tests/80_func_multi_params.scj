@@ -1,0 +1,7 @@
+// Test 80: Function with multiple parameters
+func add(a, b) {
+    return a + b
+}
+let result = add(3.0, 7.0)
+println(result)
+// Expected: 10.0

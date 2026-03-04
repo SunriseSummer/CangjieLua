@@ -1,0 +1,2 @@
+// Test 07: Parentheses
+return (1 + 2) * 3

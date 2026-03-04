@@ -1,0 +1,2 @@
+// Test 12: Chained addition
+return 1 + 2 + 3 + 4

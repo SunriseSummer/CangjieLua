@@ -1,0 +1,6 @@
+// Test 18: Task Case 1 - Basic arithmetic and constants
+// Test: register allocation, constant loading, binary operations, built-in function calls
+let a = 10.5
+let b = 2.0
+let c = a * b + 4.0 / 2.0
+println(c)

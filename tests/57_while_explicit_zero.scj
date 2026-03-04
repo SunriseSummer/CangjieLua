@@ -1,0 +1,7 @@
+// Test 57: While with explicit zero
+let x = 1.0
+while (0.0) {
+    x = 2.0
+}
+println(x)
+// Expected: 1.0 (loop body should not execute)

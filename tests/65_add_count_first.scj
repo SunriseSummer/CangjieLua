@@ -1,0 +1,9 @@
+// Test 65: ADD in loop - count first
+var count = 5.0
+var sum = 0.0
+while (count) {
+    sum = sum + count
+    count = count - 1.0
+}
+println(sum)
+// Expected: 15.0

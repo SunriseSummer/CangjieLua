@@ -1,0 +1,4 @@
+// Test 48: Variable and println
+let x = 10.0
+println(x)
+// Expected: 10.0

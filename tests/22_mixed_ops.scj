@@ -1,0 +1,6 @@
+// Test 22: Mixed operators complex
+let x = 100
+let y = 50
+let z = 25
+let result = (x + y) * z / (x - y)
+println(result)

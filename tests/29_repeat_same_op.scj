@@ -1,0 +1,6 @@
+// Test 29: Repeated same operation
+let x = 1
+let y = x + x
+let z = y + y
+let w = z + z
+println(w)

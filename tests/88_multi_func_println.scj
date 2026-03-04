@@ -1,0 +1,11 @@
+// Test 88: Multiple functions and multiple println
+func square(x) {
+    return x * x
+}
+func cube(x) {
+    return x * x * x
+}
+println(square(3.0))
+println(cube(2.0))
+println(square(4.0))
+// Expected: 9.0 then 8.0 then 16.0

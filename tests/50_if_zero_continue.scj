@@ -1,0 +1,7 @@
+// Test 50: If with zero condition then continue
+let x = 10.0
+if (0.0) {
+    x = 20.0
+}
+println(x)
+// Expected: 10.0

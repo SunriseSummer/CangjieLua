@@ -1,0 +1,6 @@
+// Test 51: Multiple vars
+let x = 10.0
+let y = 20.0
+println(x)
+println(y)
+// Expected: 10.0 then 20.0

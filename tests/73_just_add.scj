@@ -1,0 +1,7 @@
+// Test 73: Just ADD
+var a = 5.0
+var b = 0.0
+b = a + b
+println(a)
+println(b)
+// Expected: 5.0, 5.0

@@ -1,0 +1,2 @@
+// Test 20: Deeply nested parentheses
+return (((((1 + 2) * 3) + 4) * 5) + 6)

@@ -1,0 +1,2 @@
+// Test 28: Empty statements (just return)
+return 0

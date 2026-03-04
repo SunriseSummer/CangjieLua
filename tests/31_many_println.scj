@@ -1,0 +1,11 @@
+// Test 31: Many println in sequence
+println(10)
+println(20)
+println(30)
+println(40)
+println(50)
+println(60)
+println(70)
+println(80)
+println(90)
+println(100)

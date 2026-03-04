@@ -1,0 +1,5 @@
+// Test 25: Float operations
+let a = 3.14
+let b = 2.71
+let c = a * b
+println(c)

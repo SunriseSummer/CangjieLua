@@ -1,0 +1,13 @@
+// Test 89: Combined features - variables, functions, if, while, println
+func factorial(n) {
+    var result = 1.0
+    var i = n
+    while (i) {
+        result = result * i
+        i = i - 1.0
+    }
+    return result
+}
+let f5 = factorial(5.0)
+println(f5)
+// Expected: 120.0

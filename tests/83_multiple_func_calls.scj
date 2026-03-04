@@ -1,0 +1,9 @@
+// Test 83: Multiple function calls
+func inc(x) {
+    return x + 1.0
+}
+let a = inc(0.0)
+let b = inc(a)
+let c = inc(b)
+println(c)
+// Expected: 3.0

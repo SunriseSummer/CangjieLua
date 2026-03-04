@@ -1,0 +1,2 @@
+// Test 36: Println with complex expression
+println(1 + 2 * 3 - 4 / 2 + 5)

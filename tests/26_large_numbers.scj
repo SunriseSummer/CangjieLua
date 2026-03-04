@@ -1,0 +1,5 @@
+// Test 26: Large numbers
+let a = 1000000
+let b = 2000000
+let c = a * b
+println(c)

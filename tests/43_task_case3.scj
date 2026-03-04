@@ -1,0 +1,10 @@
+// Test 43: Task Case 3 - While loop control flow
+// Test: backward jump instruction, loop variable update
+var count = 5.0
+var sum = 0.0
+while (count) {
+    sum = sum + count
+    count = count - 1.0
+}
+println(sum)
+// Expected: 15.0

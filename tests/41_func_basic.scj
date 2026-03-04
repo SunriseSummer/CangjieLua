@@ -1,0 +1,11 @@
+// Test 41: Function - Task Case 4
+// Test: Proto structure generation, function stack frame setup, CALL and RETURN instructions
+func calculateArea(radius) {
+    let pi = 3.14
+    return pi * radius * radius
+}
+
+let r = 5.0
+let area = calculateArea(r)
+println(area)
+// Expected: 78.5

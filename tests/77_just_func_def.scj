@@ -1,0 +1,6 @@
+// Test 77: Just function definition
+func test() {
+    println(1.0)
+}
+println(2.0)
+// Expected: 2.0 (function not called)

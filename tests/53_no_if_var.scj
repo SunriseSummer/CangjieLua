@@ -1,0 +1,6 @@
+// Test 53: No if just var
+let x = 10.0
+let y = 30.0
+println(x)
+println(y)
+// Expected: 10.0 then 30.0

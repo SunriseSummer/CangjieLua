@@ -1,0 +1,6 @@
+// Test 35: All operators combined
+let a = 10
+let b = 20
+let c = 2
+let result = (a + b) * c / 2 - a + b
+println(result)

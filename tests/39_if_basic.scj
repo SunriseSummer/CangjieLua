@@ -1,0 +1,11 @@
+// Test 39: If statement - basic condition
+// Test: logical jump instructions, variable reassignment
+var x = 10.0
+if (x - 5.0) {
+    x = 20.0
+}
+var y = 0.0
+if (y) {
+    x = 30.0
+}
+println(x)

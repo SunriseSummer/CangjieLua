@@ -1,0 +1,7 @@
+// Test 85: Function used in expression
+func triple(x) {
+    return x * 3.0
+}
+let result = triple(4.0) + 1.0
+println(result)
+// Expected: 13.0

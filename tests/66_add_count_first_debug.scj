@@ -1,0 +1,14 @@
+// Test 66: ADD in loop - count first - with debug
+var count = 5.0
+var sum = 0.0
+while (count) {
+    println(sum)
+    println(count)
+    sum = sum + count
+    println(sum)
+    count = count - 1.0
+    println(count)
+    println(999.0)
+}
+println(sum)
+// Expected: lots of output ending with 15.0

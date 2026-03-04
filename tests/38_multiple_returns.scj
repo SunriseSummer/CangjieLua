@@ -1,0 +1,5 @@
+// Test 38: Multiple returns last one wins
+let x = 1
+let y = 2
+println(x)
+return y

@@ -1,0 +1,5 @@
+// Test 68: Simple sum
+let sum = 0.0
+let count = 5.0
+println(sum)
+println(count)

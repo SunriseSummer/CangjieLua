@@ -1,0 +1,12 @@
+// Test 86: Function with if inside
+func abs(x) {
+    if (x) {
+        return x
+    }
+    return 0.0
+}
+let a = abs(5.0)
+let b = abs(0.0)
+println(a)
+println(b)
+// Expected: 5.0 then 0.0

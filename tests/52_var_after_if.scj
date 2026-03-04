@@ -1,0 +1,9 @@
+// Test 52: Var after if
+let x = 10.0
+if (0.0) {
+    x = 20.0
+}
+let y = 30.0
+println(x)
+println(y)
+// Expected: 10.0 then 30.0

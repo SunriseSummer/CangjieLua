@@ -1,0 +1,12 @@
+// Test 81: Function calling another function
+func square(x) {
+    return x * x
+}
+func addSquares(a, b) {
+    let sa = square(a)
+    let sb = square(b)
+    return sa + sb
+}
+let result = addSquares(3.0, 4.0)
+println(result)
+// Expected: 25.0

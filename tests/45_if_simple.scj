@@ -1,0 +1,6 @@
+// Test 45: Simple if test
+let x = 10.0
+if (5.0) {
+    println(x)
+}
+// Expected: 10.0

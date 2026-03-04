@@ -1,0 +1,7 @@
+// Test 54: Simple while loop
+let x = 1.0
+while (x) {
+    x = 0.0
+}
+println(x)
+// Expected: 0.0

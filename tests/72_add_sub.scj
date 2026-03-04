@@ -1,0 +1,8 @@
+// Test 72: ADD then SUB
+var a = 5.0
+var b = 0.0
+b = b + a
+a = a - 1.0
+println(b)
+println(a)
+// Expected: 5.0, 4.0

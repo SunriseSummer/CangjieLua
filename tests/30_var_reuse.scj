@@ -1,0 +1,4 @@
+// Test 30: Variable reuse in expression
+let a = 10
+let b = a + a + a
+println(b)

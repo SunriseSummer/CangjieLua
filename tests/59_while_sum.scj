@@ -1,0 +1,12 @@
+// Test 59: While sum
+var count = 5.0
+var sum = 0.0
+while (count) {
+    sum = sum + count
+    count = count - 1.0
+    println(sum)
+    println(count)
+}
+println(999.0)
+println(sum)
+// Expected: 5,4,9,3,12,2,14,1,15,0,999,15

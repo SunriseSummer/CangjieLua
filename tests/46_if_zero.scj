@@ -1,0 +1,7 @@
+// Test 46: Simple if test with zero condition
+let x = 10.0
+if (0.0) {
+    println(x)
+}
+println(999.0)
+// Expected: nothing, then 999.0

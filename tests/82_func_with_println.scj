@@ -1,0 +1,6 @@
+// Test 82: Function with println inside
+func greet(x) {
+    println(x)
+}
+greet(42.0)
+// Expected: 42.0

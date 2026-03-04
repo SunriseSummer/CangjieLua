@@ -1,0 +1,6 @@
+// Test 61: ADD with variable reassign
+var sum = 0.0
+let count = 5.0
+sum = sum + count
+println(sum)
+// Expected: 5.0

@@ -1,0 +1,2 @@
+// Test 34: Mixed precedence complex
+return 1 + 2 * 3 - 4 / 2

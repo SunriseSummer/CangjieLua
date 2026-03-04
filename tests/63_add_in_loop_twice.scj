@@ -1,0 +1,9 @@
+// Test 63: ADD in loop twice
+var sum = 0.0
+var count = 2.0
+while (count) {
+    sum = sum + count
+    count = count - 1.0
+}
+println(sum)
+// Expected: 3.0 (0+2=2, then 2+1=3)

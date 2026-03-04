@@ -1,0 +1,2 @@
+// Test 06: Operator precedence
+return 1 + 2 * 3

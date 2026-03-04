@@ -1,0 +1,8 @@
+// Test 69: Variable order test
+var a = 1.0
+var b = 2.0
+var c = 3.0
+println(a)
+println(b)
+println(c)
+// Expected: 1.0, 2.0, 3.0

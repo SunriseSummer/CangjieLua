@@ -1,0 +1,13 @@
+// Test 87: Function with while loop inside
+func sumTo(n) {
+    var sum = 0.0
+    var i = n
+    while (i) {
+        sum = sum + i
+        i = i - 1.0
+    }
+    return sum
+}
+let result = sumTo(5.0)
+println(result)
+// Expected: 15.0

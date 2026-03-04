@@ -1,0 +1,10 @@
+// Test 37: Long variable chain computation
+let a = 1
+let b = a + 1
+let c = b + a
+let d = c + b
+let e = d + c
+let f = e + d
+let g = f + e
+let h = g + f
+println(h)

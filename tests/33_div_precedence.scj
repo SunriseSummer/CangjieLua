@@ -1,0 +1,2 @@
+// Test 33: Division precedence
+return 8 / 2 / 2
