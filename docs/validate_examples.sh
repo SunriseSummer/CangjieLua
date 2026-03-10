@@ -40,7 +40,7 @@ run_test() {
         elif echo "$output" | grep -q "\[FAIL\]"; then
             FAIL=$((FAIL + 1))
             echo "  [FAIL] $name"
-            echo "    Output: $(echo "$output" | tail -3)"
+            echo "    Output: $(echo "$output" | tail -5)"
         else
             # No assertion, just check it ran without error
             PASS=$((PASS + 1))
@@ -49,7 +49,7 @@ run_test() {
     else
         FAIL=$((FAIL + 1))
         echo "  [FAIL] $name (execution error)"
-        echo "    Output: $(echo "$output" | tail -3)"
+        echo "    Output: $(echo "$output" | tail -5)"
     fi
 }
 
@@ -260,16 +260,24 @@ existing_passed=$(echo "$existing_output" | grep "^Passed:" | awk '{print $2}')
 existing_failed=$(echo "$existing_output" | grep "^Failed:" | awk '{print $2}')
 existing_total_tests=$(echo "$existing_output" | grep "^Total:" | awk '{print $2}')
 
-echo "  现有测试: 通过 $existing_passed / 总计 $existing_total_tests (失败 $existing_failed)"
-
-if [ "$existing_failed" = "0" ]; then
-    echo "  [PASS] 所有现有测试通过"
-    PASS=$((PASS + 1))
-else
-    echo "  [FAIL] 存在失败的现有测试"
+# Validate parsed values
+if [ -z "$existing_passed" ] || [ -z "$existing_failed" ] || [ -z "$existing_total_tests" ]; then
+    echo "  [FAIL] 无法解析测试结果输出"
+    echo "    Output: $(echo "$existing_output" | tail -10)"
     FAIL=$((FAIL + 1))
+    TOTAL=$((TOTAL + 1))
+else
+    echo "  现有测试: 通过 $existing_passed / 总计 $existing_total_tests (失败 $existing_failed)"
+
+    if [ "$existing_failed" = "0" ]; then
+        echo "  [PASS] 所有现有测试通过"
+        PASS=$((PASS + 1))
+    else
+        echo "  [FAIL] 存在失败的现有测试"
+        FAIL=$((FAIL + 1))
+    fi
+    TOTAL=$((TOTAL + 1))
 fi
-TOTAL=$((TOTAL + 1))
 
 echo ""
 
