@@ -997,14 +997,11 @@ def generate_exports_table(ffi_functions: list[dict[str, str]], exports: list[st
     lines = ["| 符号 | 分类 | 是否已集成 | 仓颉签名 / 说明 | 典型扩展用途 |", "|---|---|---|---|---|"]
     for symbol in exports:
         ffi_item = ffi_by_name.get(symbol)
+        signature = f"`{ffi_item['signature']}`" if ffi_item else "未绑定，见导出符号"
+        integrated = "是" if ffi_item else "否"
+        note = note_for_export(symbol, ffi_item is not None)
         lines.append(
-            "| {symbol} | {family} | {integrated} | {signature} | {note} |".format(
-                symbol=symbol,
-                family=family_for_export(symbol),
-                integrated="是" if ffi_item else "否",
-                signature=(f"`{ffi_item['signature']}`" if ffi_item else "未绑定，见导出符号"),
-                note=note_for_export(symbol, ffi_item is not None),
-            )
+            f"| {symbol} | {family_for_export(symbol)} | {integrated} | {signature} | {note} |"
         )
     return "\n".join(lines)
 
@@ -1385,4 +1382,8 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except Exception as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        sys.exit(1)
