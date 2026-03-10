@@ -1,0 +1,6 @@
+// Test 117: while condition must be Bool
+let x = 1
+while (x) {
+    println(1)
+}
+// ExpectError: While condition must be Bool

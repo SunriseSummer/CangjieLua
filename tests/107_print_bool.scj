@@ -1,0 +1,4 @@
+// Test 107: println bool values
+println(true)
+println(false)
+// Expected: true, false

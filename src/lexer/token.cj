@@ -9,18 +9,27 @@ import std.deriving.*
 public enum TokenType {
     | EOF           // 输入结束
     | NUMBER        // 数字字面量（整数或浮点数）
+    | TRUE          // true
+    | FALSE         // false
     | IDENTIFIER    // 标识符
     // 运算符
     | PLUS          // +
     | MINUS         // -
     | STAR          // *
     | SLASH         // /
+    | EQEQ          // ==
+    | NEQ           // !=
+    | LT            // <
+    | LTE           // <=
+    | GT            // >
+    | GTE           // >=
     // 分隔符
     | LPAREN        // (
     | RPAREN        // )
     | LBRACE        // {
     | RBRACE        // }
     | COMMA         // ,
+    | COLON         // :
     | ASSIGN        // =
     // 关键字
     | LET           // let —— 不可变变量声明

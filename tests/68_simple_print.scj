@@ -3,3 +3,4 @@ let sum = 0.0
 let count = 5.0
 println(sum)
 println(count)
+// Expected: 0.0, 5.0

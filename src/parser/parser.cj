@@ -1,26 +1,36 @@
 package cangjie_lua.parser
 
+import cangjie_lua.errors.*
 import cangjie_lua.lexer.*
 import std.collection.*
+import std.convert.*
 
-// ============================================================
-// Parser —— 递归下降语法分析器
-// 将 Token 序列解析为 AST（抽象语法树）
-// 
-// 文法：
-//   program     → declaration* EOF
-//   declaration → varDecl | funcDecl | statement
-//   varDecl     → ("let" | "var") IDENTIFIER "=" expression
-//   funcDecl    → "func" IDENTIFIER "(" params? ")" "{" block "}"
-//   statement   → ifStmt | whileStmt | returnStmt | block | exprOrAssign
-//   expression  → addition
-//   addition    → multiplication (("+" | "-") multiplication)*
-//   multiplication → primary (("*" | "/") primary)*
-//   primary     → NUMBER | IDENTIFIER ("(" args? ")")? | "(" expression ")"
-// ============================================================
+// Parser：递归下降语法分析器
+// 负责将 Token 序列转换为 AST，并在解析阶段完成一小部分轻量语义约束
+// （例如 if/while 条件必须为 Bool、函数参数需带类型标注）
+//
+// 文法（简化）：
+//   program        → declaration* EOF
+//   declaration    → varDecl | funcDecl | statement
+//   varDecl        → ("let" | "var") IDENTIFIER "=" expression
+//   funcDecl       → "func" IDENTIFIER "(" params? ")" (":" type)? "{" block "}"
+//   statement      → ifStmt | whileStmt | returnStmt | block | exprOrAssign
+//   expression     → comparison
+//   comparison     → addition (("=="|"!="|"<"|"<="|">"|">=") addition)*
+//   addition       → multiplication (("+"|"-") multiplication)*
+//   multiplication → unary (("*"|"/") unary)*
+//   unary          → "-" unary | primary
+//   primary        → NUMBER | BOOL | IDENTIFIER ("(" args? ")")? | "(" expression ")"
 public class Parser {
     private let tokens: ArrayList<Token>  // 词法单元列表
     private var pos: Int64 = 0            // 当前解析位置
+    private var _error: ?CompileError = None
+    private var varTypes = HashMap<String, String>()
+    private var functionReturnTypes = HashMap<String, String>()
+
+    public prop error: ?CompileError {
+        get() { _error }
+    }
 
     public init(tokens: ArrayList<Token>) {
         this.tokens = tokens
@@ -55,19 +65,31 @@ public class Parser {
         return current().tokenType == tokenType
     }
 
-    /// 断言当前 Token 为指定类型并消费，否则抛出异常
+    /// 断言当前 Token 为指定类型并消费，否则记录错误并尽量前进恢复
     private func consume(tokenType: TokenType, message: String): Token {
         if (check(tokenType)) {
             return advance()
         }
-        throw Exception("${message} at line ${current().line}, got ${current().text}")
+        match (_error) {
+            case None =>
+                _error = CompileError(ErrorStage.PARSER, "${message}, got '${current().text}'", current().line)
+            case _ => ()
+        }
+        return advance()
     }
 
     /// 解析入口：将 Token 列表解析为语句列表
-    public func parse(): ArrayList<Stmt> {
+    public func parse(): ?ArrayList<Stmt> {
+        _error = None<CompileError>
+        varTypes = HashMap<String, String>()
+        functionReturnTypes = HashMap<String, String>()
         var statements = ArrayList<Stmt>()
         while (!check(TokenType.EOF)) {
             statements.add(parseDeclaration())
+            match (_error) {
+                case Some(_) => return None
+                case None => ()
+            }
         }
         return statements
     }
@@ -93,6 +115,7 @@ public class Parser {
 
         consume(TokenType.ASSIGN, "Expected '=' after variable name")
         let initExpr = parseExpression()
+        varTypes[name] = inferExprType(initExpr)
 
         return Stmt.VarDecl(name, isMutable, initExpr)
     }
@@ -105,23 +128,50 @@ public class Parser {
 
         consume(TokenType.LPAREN, "Expected '(' after function name")
 
-        var params = ArrayList<String>()
+        var params = ArrayList<FuncParam>()
         if (!check(TokenType.RPAREN)) {
-            let firstParam = consume(TokenType.IDENTIFIER, "Expected parameter name")
-            params.add(firstParam.text)
-            while (check(TokenType.COMMA)) {
-                advance()
-                let param = consume(TokenType.IDENTIFIER, "Expected parameter name")
-                params.add(param.text)
+            // 支持 func f(x: Int64, y: Float64)
+            while (true) {
+                let paramToken = consume(TokenType.IDENTIFIER, "Expected parameter name")
+                let paramName = paramToken.text
+                // 必须有冒号和类型名
+                if (!check(TokenType.COLON)) {
+                    match (_error) {
+                        case None =>
+                            _error = CompileError(ErrorStage.PARSER, "Function parameter '${paramName}' missing type annotation", paramToken.line)
+                        case _ => ()
+                    }
+                    // 跳过到下一个逗号或右括号
+                    while (!check(TokenType.COMMA) && !check(TokenType.RPAREN) && !check(TokenType.EOF)) { advance() }
+                    params.add(FuncParam(paramName, ""))
+                } else {
+                    advance() // 跳过冒号
+                    let typeToken = consume(TokenType.IDENTIFIER, "Expected type name after ':'")
+                    params.add(FuncParam(paramName, typeToken.text))
+                }
+                if (check(TokenType.COMMA)) {
+                    advance()
+                } else {
+                    break
+                }
             }
         }
         consume(TokenType.RPAREN, "Expected ')' after parameters")
+
+        // 支持可选的返回类型标注 : Type
+        var returnType: ?String = None
+        if (check(TokenType.COLON)) {
+            advance()
+            let typeToken = consume(TokenType.IDENTIFIER, "Expected return type name after ':'")
+            returnType = typeToken.text
+            functionReturnTypes[name] = typeToken.text
+        }
 
         consume(TokenType.LBRACE, "Expected '{' before function body")
         let body = parseBlock()
         consume(TokenType.RBRACE, "Expected '}' after function body")
 
-        return Stmt.FuncDecl(name, params, body)
+        return Stmt.FuncDecl(name, params, returnType, body)
     }
 
     /// 解析语句（if / while / return / block / 表达式或赋值）
@@ -149,6 +199,13 @@ public class Parser {
         consume(TokenType.IF, "Expected 'if'")
         consume(TokenType.LPAREN, "Expected '(' after 'if'")
         let condition = parseExpression()
+        if (inferExprType(condition) != "Bool") {
+            match (_error) {
+                case None =>
+                    _error = CompileError(ErrorStage.PARSER, "If condition must be Bool", current().line)
+                case _ => ()
+            }
+        }
         consume(TokenType.RPAREN, "Expected ')' after condition")
 
         consume(TokenType.LBRACE, "Expected '{' before if body")
@@ -175,6 +232,13 @@ public class Parser {
         consume(TokenType.WHILE, "Expected 'while'")
         consume(TokenType.LPAREN, "Expected '(' after 'while'")
         let condition = parseExpression()
+        if (inferExprType(condition) != "Bool") {
+            match (_error) {
+                case None =>
+                    _error = CompileError(ErrorStage.PARSER, "While condition must be Bool", current().line)
+                case _ => ()
+            }
+        }
         consume(TokenType.RPAREN, "Expected ')' after condition")
 
         consume(TokenType.LBRACE, "Expected '{' before while body")
@@ -206,15 +270,38 @@ public class Parser {
             let nameToken = advance()
             advance()
             let value = parseExpression()
+            varTypes[nameToken.text] = inferExprType(value)
             return Stmt.Assignment(nameToken.text, value)
         }
         let expr = parseExpression()
         return Stmt.ExprStmt(expr)
     }
 
-    /// 解析表达式（入口，当前等价于加减运算）
+    /// 表达式解析入口（最低优先级层）：比较运算
     private func parseExpression(): Expr {
-        return parseAddition()
+        return parseComparison()
+    }
+
+    /// 解析比较运算（优先级低于加减）
+    private func parseComparison(): Expr {
+        var left = parseAddition()
+
+        while (check(TokenType.EQEQ) || check(TokenType.NEQ) || check(TokenType.LT) || check(TokenType.LTE) || check(TokenType.GT) || check(TokenType.GTE)) {
+            let op = match (current().tokenType) {
+                case TokenType.EQEQ => BinaryOp.EQ
+                case TokenType.NEQ => BinaryOp.NEQ
+                case TokenType.LT => BinaryOp.LT
+                case TokenType.LTE => BinaryOp.LTE
+                case TokenType.GT => BinaryOp.GT
+                case TokenType.GTE => BinaryOp.GTE
+                case _ => BinaryOp.EQ
+            }
+            advance()
+            let right = parseAddition()
+            left = Expr.Binary(Box(left), op, Box(right))
+        }
+
+        return left
     }
 
     /// 解析加减运算（左结合）
@@ -233,23 +320,50 @@ public class Parser {
 
     /// 解析乘除运算（左结合，优先级高于加减）
     private func parseMultiplication(): Expr {
-        var left = parsePrimary()
+        var left = parseUnary()
 
         while (check(TokenType.STAR) || check(TokenType.SLASH)) {
             let op = if (check(TokenType.STAR)) { BinaryOp.MUL } else { BinaryOp.DIV }
             advance()
-            let right = parsePrimary()
+            let right = parseUnary()
             left = Expr.Binary(Box(left), op, Box(right))
         }
 
         return left
     }
 
+    /// 解析一元运算（当前仅支持一元负号）
+    private func parseUnary(): Expr {
+        if (check(TokenType.MINUS)) {
+            advance()
+            let right = parseUnary()
+            match (right) {
+                case Expr.IntLiteral(v) => return Expr.IntLiteral(-v)
+                case Expr.FloatLiteral(v) => return Expr.FloatLiteral(-v)
+                case _ => return Expr.Binary(Box(Expr.IntLiteral(0)), BinaryOp.SUB, Box(right))
+            }
+        }
+        return parsePrimary()
+    }
+
     /// 解析基本表达式（数字、变量、函数调用、括号表达式）
     private func parsePrimary(): Expr {
         if (check(TokenType.NUMBER)) {
             let token = advance()
-            return Expr.Number(token.value)
+            if (token.text.contains(".")) {
+                return Expr.FloatLiteral(Float64.parse(token.text))
+            }
+            return Expr.IntLiteral(Int64.parse(token.text))
+        }
+
+        if (check(TokenType.TRUE)) {
+            advance()
+            return Expr.BoolLiteral(true)
+        }
+
+        if (check(TokenType.FALSE)) {
+            advance()
+            return Expr.BoolLiteral(false)
         }
 
         if (check(TokenType.IDENTIFIER)) {
@@ -277,6 +391,43 @@ public class Parser {
             return expr
         }
 
-        throw Exception("Unexpected token: ${current().text} at line ${current().line}")
+        match (_error) {
+            case None =>
+                _error = CompileError(ErrorStage.PARSER, "Unexpected token '${current().text}'", current().line)
+            case _ => ()
+        }
+        advance()
+        return Expr.IntLiteral(0)
+    }
+
+    /// 轻量类型推断：仅服务于解析期校验，不替代完整类型系统
+    private func inferExprType(expr: Expr): String {
+        match (expr) {
+            case Expr.IntLiteral(_) => "Number"
+            case Expr.FloatLiteral(_) => "Number"
+            case Expr.BoolLiteral(_) => "Bool"
+            case Expr.Variable(name) =>
+                if (let Some(t) <- varTypes.get(name)) {
+                    t
+                } else {
+                    "Unknown"
+                }
+            case Expr.Call(funcName, _) =>
+                if (let Some(t) <- functionReturnTypes.get(funcName)) {
+                    if (t == "Bool") { "Bool" } else { "Number" }
+                } else {
+                    "Unknown"
+                }
+            case Expr.Binary(_, op, _) =>
+                match (op) {
+                    case BinaryOp.EQ => "Bool"
+                    case BinaryOp.NEQ => "Bool"
+                    case BinaryOp.LT => "Bool"
+                    case BinaryOp.LTE => "Bool"
+                    case BinaryOp.GT => "Bool"
+                    case BinaryOp.GTE => "Bool"
+                    case _ => "Number"
+                }
+        }
     }
 }

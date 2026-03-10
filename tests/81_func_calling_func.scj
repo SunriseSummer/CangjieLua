@@ -1,8 +1,8 @@
 // Test 81: Function calling another function
-func square(x) {
+func square(x: Float64) {
     return x * x
 }
-func addSquares(a, b) {
+func addSquares(a: Float64, b: Float64) {
     let sa = square(a)
     let sb = square(b)
     return sa + sb

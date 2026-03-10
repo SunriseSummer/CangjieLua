@@ -2,20 +2,15 @@ package cangjie_lua.codegen
 
 import std.collection.*
 
-// ============================================================
-// VarInt 编码常量（Lua 5.5 使用 LSB-first 变长整数编码）
-// ============================================================
+// VarInt 编码常量（Lua 5.5 使用 MSB Varint）
 let VARINT_CONTINUE_MASK: Int64 = 0x80  // 最高位为 1 表示后续还有字节
 let VARINT_DATA_MASK:     Int64 = 0x7F  // 低 7 位为数据位
 
 // 短字符串长度阈值：len < 此值时用单字节表示长度
 let SHORT_STRING_LEN_THRESHOLD: Int64 = 254
 
-// ============================================================
-// ChunkWriter —— Lua 二进制块写入器
-// 负责将字节码数据序列化为 Lua 5.5 二进制格式。
-// 内部维护一个字节缓冲区，提供多种写入方法。
-// ============================================================
+// ChunkWriter：Lua 二进制块写入器
+// 负责将字节码数据序列化为 Lua 5.5 二进制格式
 public class ChunkWriter {
     private var buffer = ArrayList<UInt8>()  // 输出字节缓冲区
 
@@ -59,6 +54,17 @@ public class ChunkWriter {
         buffer.add(UInt8((n >> 40) & 0xFF))
         buffer.add(UInt8((n >> 48) & 0xFF))
         buffer.add(UInt8((n >> 56) & 0xFF))
+    }
+
+    /// 写入 Lua 常量表中的整数（与 Lua dumpInteger 编码一致）
+    /// 非负数编码为 2x；负数编码为 -2x-1（等价于 2*~x+1）
+    public func writeLuaInteger(n: Int64): Unit {
+        let coded = if (n >= 0) {
+            n * 2
+        } else {
+            (-n * 2) - 1
+        }
+        writeVarInt(coded)
     }
 
     /// 写入 64 位浮点数（通过 unsafe 内存拷贝获取 IEEE 754 字节表示）
@@ -106,15 +112,23 @@ public class ChunkWriter {
         writeByte(0u8)  // NUL 终止符
     }
 
-    /// 写入变长整数（LSB-first VarInt 编码）
-    /// 每字节低 7 位为数据，最高位为 1 表示后续还有字节
+    /// 写入变长整数（MSB Varint 编码，与 Lua dumpVarint 一致）
+    /// 高位组先写，除最后一个字节外都带 continuation 位
     public func writeVarInt(n: Int64): Unit {
         var val = n
-        while (val >= VARINT_CONTINUE_MASK) {
-            writeByte(UInt8((val & VARINT_DATA_MASK) | VARINT_CONTINUE_MASK))
+        var bytes = ArrayList<UInt8>()
+        // 最低 7 位作为最后一个字节（无 continuation 位）
+        bytes.add(UInt8(val & VARINT_DATA_MASK))
+        val = val >> 7
+        while (val != 0) {
+            bytes.add(UInt8((val & VARINT_DATA_MASK) | VARINT_CONTINUE_MASK))
             val = val >> 7
         }
-        writeByte(UInt8(val))
+        var i = bytes.size - 1
+        while (i >= 0) {
+            writeByte(bytes[i])
+            i--
+        }
     }
 
     /// 写入空字符串标记（两个 0 字节）

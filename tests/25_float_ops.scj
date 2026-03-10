@@ -3,3 +3,4 @@ let a = 3.14
 let b = 2.71
 let c = a * b
 println(c)
+// Expected: 8.5094

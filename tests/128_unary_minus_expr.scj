@@ -1,0 +1,5 @@
+// Test 128: unary minus on expression
+let x = 2
+println(-(x + 3))
+println(1 + -2)
+// Expected: -5, -1

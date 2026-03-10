@@ -3,3 +3,4 @@ let a = 1000000
 let b = 2000000
 let c = a * b
 println(c)
+// Expected: 2000000000000.0

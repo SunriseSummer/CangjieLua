@@ -1,0 +1,4 @@
+// Test 126: unary minus on Int64
+println(-3)
+println(-(2))
+// Expected: -3, -2

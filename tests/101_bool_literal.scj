@@ -1,0 +1,7 @@
+// Test 101: Bool literal and Bool parameter support
+func alwaysOne(flag: Bool): Int64 {
+    return 1
+}
+println(alwaysOne(true))
+println(alwaysOne(false))
+// Expected: 1.0, 1.0

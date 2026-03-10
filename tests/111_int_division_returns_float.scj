@@ -1,0 +1,5 @@
+// Test 111: integer division operator '/' should return float semantics
+let a = 5
+let b = 2
+println(a / b)
+// Expected: 2.5

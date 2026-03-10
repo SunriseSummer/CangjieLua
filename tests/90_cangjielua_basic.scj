@@ -1,0 +1,4 @@
+// Test 90: CangjieLua class basic test
+// Test: CangjieLua.run() executes and returns result
+println(42.0)
+// Expected: 42.0

@@ -1,0 +1,4 @@
+// Test 93: Parser error - missing closing paren
+// Test: error handling for syntax errors
+println(42
+// ExpectError: Expected ')' after arguments

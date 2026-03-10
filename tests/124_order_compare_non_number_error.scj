@@ -1,0 +1,3 @@
+// Test 124: non-number order compare should error at runtime
+println(true < false)
+// ExpectError: attempt to compare

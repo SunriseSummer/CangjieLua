@@ -1,0 +1,8 @@
+// Test 130: unary minus participates in comparison (Bool result)
+if (-1 < 0) {
+    println(1)
+} else {
+    println(0)
+}
+println(-1.5 < -1)
+// Expected: 1, true

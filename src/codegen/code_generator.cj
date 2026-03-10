@@ -3,24 +3,18 @@ package cangjie_lua.codegen
 import cangjie_lua.parser.*
 import std.collection.*
 
-// ============================================================
-// Lua 5.5 常量类型标签（用于二进制块中的常量表）
-// ============================================================
+// Lua 5.5 常量类型标签（用于二进制块常量表）
+let LUA_VNUMINT:  UInt8 = 0x03  // 整数常量
 let LUA_VNUMFLT:  UInt8 = 0x13  // 浮点数常量
 let LUA_VSHRSTR:  UInt8 = 0x04  // 短字符串常量
 
-// ============================================================
-// MMBIN 元方法编号（算术运算的元方法索引）
-// 在 MMBIN 指令中用于指定触发哪个元方法的回退
-// ============================================================
+// MMBIN 元方法编号（算术运算回退用）
 let MM_ADD: UInt32 = 6   // __add  加法
 let MM_SUB: UInt32 = 7   // __sub  减法
 let MM_MUL: UInt32 = 8   // __mul  乘法
 let MM_DIV: UInt32 = 9   // __div  除法
 
-// ============================================================
 // LOADI/LOADF/LOADK 指令的操作数范围限制
-// ============================================================
 let LOADI_MIN: Int64 = -32768      // LOADI sBx 最小值 (-(2^15))
 let LOADI_MAX: Int64 = 32767       // LOADI sBx 最大值 (2^15 - 1)
 let LOADF_MIN: Int64 = -65536      // LOADF sBx 最小值 (-(2^16))
@@ -30,9 +24,7 @@ let LOADK_MAX: Int64 = 131072      // LOADK Bx 最大值 (2^17)，超过则需�
 // RK 编码：当寄存器索引 >= 此值时，表示引用常量表而非寄存器
 let RK_CONSTANT_BIT: UInt32 = 0x100  // 第 9 位标记常量引用
 
-// ============================================================
 // Upvalue 描述字段常量
-// ============================================================
 let UPVAL_INSTACK:     UInt8 = 0x01  // 上值在栈上（直接捕获）
 let UPVAL_NOT_INSTACK: UInt8 = 0x00  // 上值不在栈上（从父级继承）
 let UPVAL_IDX_ZERO:    UInt8 = 0x00  // 上值索引 0（通常指 _ENV）
@@ -45,16 +37,13 @@ let FUNC_NOT_VARARG:   UInt8 = 0x00  // 函数不是变长参数函数
 // 栈空间额外保留量（Lua 要求 maxStackSize 至少比实际使用多 2）
 let STACK_EXTRA: Int64 = 2
 
-// ============================================================
-// CodeGenerator —— 字节码生成器
-// 将 AST 翻译为 Lua 5.5 虚拟机可执行的二进制字节码。
-// 
+// CodeGenerator：将 AST 翻译为 Lua 5.5 字节码
+//
 // 核心职责：
-// - 常量表管理（数字、字符串去重）
-// - 寄存器分配（基于栈的线性分配）
-// - 指令发射（通过 encodeABC/ABx/AsBx/IsJ 编码）
-// - 二进制块序列化（头部 + 函数原型）
-// ============================================================
+// - 常量池管理（数字/字符串去重）
+// - 寄存器与栈深跟踪
+// - 指令发射与跳转回填
+// - 主函数与子函数原型序列化
 public class CodeGenerator {
     // 常量表
     private var constants = ArrayList<Constant>()          // 常量列表
@@ -77,14 +66,26 @@ public class CodeGenerator {
 
     public init() {}
 
-    /// 添加数字常量到常量表（去重），返回索引
-    private func addConstant(value: Float64): Int64 {
-        let key = "num_${value}"
+    /// 添加浮点数常量到常量表（去重），返回索引
+    private func addConstantFloat(value: Float64): Int64 {
+        let key = "flt_${value}"
         if (let Some(v) <- constantIndex.get(key)) {
             return v
         }
         let idx = constants.size
-        constants.add(Constant.Number(value))
+        constants.add(Constant.FloatNumber(value))
+        constantIndex[key] = idx
+        return idx
+    }
+
+    /// 添加整数常量到常量表（去重），返回索引
+    private func addConstantInt(value: Int64): Int64 {
+        let key = "int_${value}"
+        if (let Some(v) <- constantIndex.get(key)) {
+            return v
+        }
+        let idx = constants.size
+        constants.add(Constant.IntNumber(value))
         constantIndex[key] = idx
         return idx
     }
@@ -137,6 +138,11 @@ public class CodeGenerator {
     /// 发射 iABx 格式指令
     private func emitABx(op: OpCodes, a: UInt32, bx: UInt32): Unit {
         emit(encodeABx(op, a, bx))
+    }
+
+    /// 发射 iABC(k) 格式指令
+    private func emitABCK(op: OpCodes, a: UInt32, b: UInt32, c: UInt32, k: UInt32): Unit {
+        emit(encodeABCK(op, a, b, c, k))
     }
     /// 发射 iAsBx 格式指令（有符号偏移量）
     private func emitAsBx(op: OpCodes, a: UInt32, sbx: Int32): Unit {
@@ -214,7 +220,7 @@ public class CodeGenerator {
                 generateIfStmt(condition, thenBranch, elseBranch, isMain)
             case Stmt.WhileStmt(condition, body) =>
                 generateWhileStmt(condition, body, isMain)
-            case Stmt.FuncDecl(name, params, body) =>
+            case Stmt.FuncDecl(name, params, returnType, body) =>
                 // 函数声明：创建子代码生成器编译函数体，
                 // 然后用 CLOSURE 创建闭包，并通过 SETTABUP 注册为全局函数
                 let funcGen = CodeGenerator()
@@ -244,7 +250,7 @@ public class CodeGenerator {
     ///
     /// 生成模式：
     ///   <计算条件到 condReg>
-    ///   EQI condReg 0 1     -- 如果条件 == 0 则跳过 then
+    ///   TEST condReg 0      -- false/nil 视为假（条件已在 parser 限定为 Bool）
     ///   JMP <跳过 then>
     ///   <then 分支>
     ///   JMP <跳过 else>       -- 仅当有 else 时
@@ -255,9 +261,8 @@ public class CodeGenerator {
         generateExpr(condition, condReg)
 
         currentStack = savedStack
-        emit(encodeEQI(condReg, 0, 1u32))
-
-        let testIdx = instructions.size
+        emitABC(OpCodes.TEST, condReg, 0u32, 0u32)
+        let testJmpIdx = instructions.size
         emitIsJ(OpCodes.JMP, 0)
 
         generateStatements(thenBranch, isMain)
@@ -267,8 +272,8 @@ public class CodeGenerator {
             emitIsJ(OpCodes.JMP, 0)
 
             let thenEnd = instructions.size
-            let testOffset = Int32(thenEnd - testIdx - 1)
-            instructions[testIdx] = encodeIsJ(OpCodes.JMP, testOffset)
+            let testOffset = Int32(thenEnd - testJmpIdx - 1)
+            instructions[testJmpIdx] = encodeIsJ(OpCodes.JMP, testOffset)
 
             currentStack = savedStack
             generateStatements(elseBranch, isMain)
@@ -279,8 +284,8 @@ public class CodeGenerator {
             instructions[elseJmpIdx] = encodeIsJ(OpCodes.JMP, elseOffset)
         } else {
             let thenEnd = instructions.size
-            let testOffset = Int32(thenEnd - testIdx - 1)
-            instructions[testIdx] = encodeIsJ(OpCodes.JMP, testOffset)
+            let testOffset = Int32(thenEnd - testJmpIdx - 1)
+            instructions[testJmpIdx] = encodeIsJ(OpCodes.JMP, testOffset)
             currentStack = savedStack
         }
     }
@@ -290,7 +295,7 @@ public class CodeGenerator {
     /// 生成模式：
     ///   loopStart:
     ///     <计算条件到 condReg>
-    ///     EQI condReg 0 1   -- 如果条件 == 0 则退出循环
+    ///     TEST condReg 0    -- false/nil 视为假（条件已在 parser 限定为 Bool）
     ///     JMP <跳到 afterLoop>
     ///     <循环体>
     ///     JMP <跳回 loopStart>
@@ -303,9 +308,8 @@ public class CodeGenerator {
         generateExpr(condition, condReg)
 
         currentStack = savedStack
-        emit(encodeEQI(condReg, 0, 1u32))
-
-        let testIdx = instructions.size
+        emitABC(OpCodes.TEST, condReg, 0u32, 0u32)
+        let testJmpIdx = instructions.size
         emitIsJ(OpCodes.JMP, 0)
 
         generateStatements(body, isMain)
@@ -317,8 +321,8 @@ public class CodeGenerator {
         emitIsJ(OpCodes.JMP, backOffset)
 
         let afterLoop = instructions.size
-        let testOffset = Int32(afterLoop - testIdx - 1)
-        instructions[testIdx] = encodeIsJ(OpCodes.JMP, testOffset)
+        let testOffset = Int32(afterLoop - testJmpIdx - 1)
+        instructions[testJmpIdx] = encodeIsJ(OpCodes.JMP, testOffset)
     }
 
     /// 生成表达式语句的字节码（主要处理函数调用）
@@ -357,25 +361,36 @@ public class CodeGenerator {
     /// 生成表达式的字节码，将结果存入目标寄存器 dest
     private func generateExpr(expr: Expr, dest: UInt32): Unit {
         match (expr) {
-            case Expr.Number(value) =>
-                // 根据数值范围选择最优的加载指令
-                let intVal = Int64(value)
-                if (value == Float64(intVal) && intVal >= LOADI_MIN && intVal <= LOADI_MAX) {
-                    // 小整数：使用 LOADI（sBx 直接编码）
-                    emitAsBx(OpCodes.LOADI, dest, Int32(intVal))
-                } else if (value == Float64(intVal) && intVal >= LOADF_MIN && intVal <= LOADF_MAX) {
-                    // 稍大的整数：使用 LOADF（作为浮点数直接编码）
-                    emitAsBx(OpCodes.LOADF, dest, Int32(intVal))
+            case Expr.IntLiteral(value) =>
+                if (value >= LOADI_MIN && value <= LOADI_MAX) {
+                    emitAsBx(OpCodes.LOADI, dest, Int32(value))
                 } else {
-                    // 其他值：从常量表加载
-                    let idx = addConstant(value)
+                    let idx = addConstantInt(value)
                     if (idx < LOADK_MAX) {
                         emitABx(OpCodes.LOADK, dest, UInt32(idx))
                     } else {
-                        // 常量索引超出 Bx 范围，使用 LOADKX + EXTRAARG
                         emitABx(OpCodes.LOADKX, dest, 0u32)
                         emitABx(OpCodes.EXTRAARG, 0u32, UInt32(idx))
                     }
+                }
+            case Expr.FloatLiteral(value) =>
+                let intVal = Int64(value)
+                if (value == Float64(intVal) && intVal >= LOADF_MIN && intVal <= LOADF_MAX) {
+                    emitAsBx(OpCodes.LOADF, dest, Int32(intVal))
+                } else {
+                    let idx = addConstantFloat(value)
+                    if (idx < LOADK_MAX) {
+                        emitABx(OpCodes.LOADK, dest, UInt32(idx))
+                    } else {
+                        emitABx(OpCodes.LOADKX, dest, 0u32)
+                        emitABx(OpCodes.EXTRAARG, 0u32, UInt32(idx))
+                    }
+                }
+            case Expr.BoolLiteral(value) =>
+                if (value) {
+                    emitABC(OpCodes.LOADTRUE, dest, 0u32, 0u32)
+                } else {
+                    emitABC(OpCodes.LOADFALSE, dest, 0u32, 0u32)
                 }
             case Expr.Variable(name) =>
                 // 变量引用：优先查找局部变量，否则从全局表加载
@@ -387,6 +402,29 @@ public class CodeGenerator {
                     emitABC(OpCodes.GETTABUP, dest, 0u32, UInt32(nameIdx))
                 }
             case Expr.Binary(left, op, right) =>
+                // 比较运算统一走内建比较函数，结果为 Bool
+                match (op) {
+                    case BinaryOp.EQ =>
+                        generateCompareExpr(op, left.value, right.value, dest)
+                        return
+                    case BinaryOp.NEQ =>
+                        generateCompareExpr(op, left.value, right.value, dest)
+                        return
+                    case BinaryOp.LT =>
+                        generateCompareExpr(op, left.value, right.value, dest)
+                        return
+                    case BinaryOp.LTE =>
+                        generateCompareExpr(op, left.value, right.value, dest)
+                        return
+                    case BinaryOp.GT =>
+                        generateCompareExpr(op, left.value, right.value, dest)
+                        return
+                    case BinaryOp.GTE =>
+                        generateCompareExpr(op, left.value, right.value, dest)
+                        return
+                    case _ => ()
+                }
+
                 // 二元运算：先计算左操作数到 dest，再计算右操作数到临时寄存器
                 let leftReg = dest
                 generateExpr(left.value, leftReg)
@@ -414,6 +452,7 @@ public class CodeGenerator {
                     case BinaryOp.DIV => 
                         emitABC(OpCodes.DIV, dest, leftReg, rightReg)
                         emitABC(OpCodes.MMBIN, leftReg, rightReg, MM_DIV)
+                    case _ => ()
                 }
             case Expr.Call(funcName, args) =>
                 // 函数调用（作为表达式，需要返回值）
@@ -437,8 +476,60 @@ public class CodeGenerator {
         }
     }
 
+    /// 生成比较表达式，并在 `dest` 写入 Bool 结果
+    ///
+    /// 采用“先置 false，再按条件改写为 true”的统一模板：
+    /// 1) `dest = false`
+    /// 2) 发射比较指令（EQ/LT/LE，必要时交换左右操作数）
+    /// 3) 条件不满足时通过 `JMP` 跳过 `LOADTRUE`
+    private func generateCompareExpr(op: BinaryOp, left: Expr, right: Expr, dest: UInt32): Unit {
+        let savedStack = currentStack
+        let leftReg = dest + 1u32
+        let rightReg = dest + 2u32
+        currentStack = Int64(rightReg) + 1
+        if (currentStack > maxStack) {
+            maxStack = currentStack
+        }
+
+        generateExpr(left, leftReg)
+        generateExpr(right, rightReg)
+
+        // 默认结果 false
+        emitABC(OpCodes.LOADFALSE, dest, 0u32, 0u32)
+
+        // 生成比较指令 + 跳过 LOADTRUE 的跳转
+        // 统一模式：比较指令设置 k，使“目标条件为假”时执行后续 JMP 跳过 LOADTRUE
+        match (op) {
+            case BinaryOp.EQ =>
+                // cond = (left == right), 目标为假时 cond=0
+                emitABCK(OpCodes.EQ, leftReg, rightReg, 0u32, 0u32)
+            case BinaryOp.NEQ =>
+                // cond = (left == right), 目标为假时 cond=1
+                emitABCK(OpCodes.EQ, leftReg, rightReg, 0u32, 1u32)
+            case BinaryOp.LT =>
+                // cond = (left < right), 目标为假时 cond=0
+                emitABCK(OpCodes.LT, leftReg, rightReg, 0u32, 0u32)
+            case BinaryOp.LTE =>
+                // cond = (left <= right), 目标为假时 cond=0
+                emitABCK(OpCodes.LE, leftReg, rightReg, 0u32, 0u32)
+            case BinaryOp.GT =>
+                // left > right 等价 right < left，目标为假时 cond=0
+                emitABCK(OpCodes.LT, rightReg, leftReg, 0u32, 0u32)
+            case BinaryOp.GTE =>
+                // left >= right 等价 right <= left，目标为假时 cond=0
+                emitABCK(OpCodes.LE, rightReg, leftReg, 0u32, 0u32)
+            case _ => ()
+        }
+
+        // 当目标条件为假时跳过 LOADTRUE
+        emitIsJ(OpCodes.JMP, 1)
+        emitABC(OpCodes.LOADTRUE, dest, 0u32, 0u32)
+
+        currentStack = savedStack
+    }
+
     /// 编译子函数体（供 FuncDecl 调用）
-    private func generateFunction(params: ArrayList<String>, body: ArrayList<Stmt>): Unit {
+    private func generateFunction(params: ArrayList<FuncParam>, body: ArrayList<Stmt>): Unit {
         // 重置生成器状态
         locals = ArrayList<String>()
         localIndex = HashMap<String, Int64>()
@@ -450,8 +541,9 @@ public class CodeGenerator {
 
         // 注册参数为局部变量
         for (i in 0..params.size) {
-            locals.add(params[i])
-            localIndex[params[i]] = i
+            let paramName = params[i].name
+            locals.add(paramName)
+            localIndex[paramName] = i
         }
 
         generateStatements(body, false)
@@ -482,7 +574,10 @@ public class CodeGenerator {
         writer.writeVarIntInt(Int32(constants.size))
         for (c in constants) {
             match (c) {
-                case Constant.Number(v) =>
+                case Constant.IntNumber(v) =>
+                    writer.writeByte(LUA_VNUMINT)   // 整数类型标签
+                    writer.writeLuaInteger(v)
+                case Constant.FloatNumber(v) =>
                     writer.writeByte(LUA_VNUMFLT)   // 浮点数类型标签
                     writer.writeFloat64(v)
                 case Constant.Str(s) =>
@@ -538,7 +633,10 @@ public class CodeGenerator {
         writer.writeVarIntInt(Int32(gen.constants.size))
         for (c in gen.constants) {
             match (c) {
-                case Constant.Number(v) =>
+                case Constant.IntNumber(v) =>
+                    writer.writeByte(LUA_VNUMINT)
+                    writer.writeLuaInteger(v)
+                case Constant.FloatNumber(v) =>
                     writer.writeByte(LUA_VNUMFLT)
                     writer.writeFloat64(v)
                 case Constant.Str(s) =>
@@ -573,7 +671,8 @@ public class CodeGenerator {
 
 /// 常量类型：Lua 常量表中的条目
 public enum Constant {
-    | Number(Float64)  // 浮点数常量
+    | IntNumber(Int64)     // Int64 常量
+    | FloatNumber(Float64) // Float64 常量
     | Str(String)      // 字符串常量
 }
 

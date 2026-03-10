@@ -1,9 +1,9 @@
 // Test 84: Function with local variable and arithmetic
-func compute(a, b) {
+func compute(a: Float64, b: Float64) {
     let sum = a + b
     let product = a * b
     return sum + product
 }
 let result = compute(2.0, 3.0)
 println(result)
-// Expected: 11.0 (2+3=5, 2*3=6, 5+6=11)
+// Expected: 11.0

@@ -1,0 +1,5 @@
+// Test 98: Function parameter must have type annotation
+func bad(x) {
+    return x
+}
+// ExpectError: Function parameter 'x' missing type annotation

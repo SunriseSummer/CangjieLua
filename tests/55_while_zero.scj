@@ -1,6 +1,6 @@
 // Test 55: Even simpler while
-while (0.0) {
+while (0.0 > 0.0) {
     println(1.0)
 }
 println(2.0)
-// Expected: 2.0 (loop body should not execute)
+// Expected: 2.0

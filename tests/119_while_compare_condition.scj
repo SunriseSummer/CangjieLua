@@ -1,0 +1,9 @@
+// Test 119: while condition from comparison expression (Bool)
+var n = 3
+var sum = 0
+while (n > 0) {
+    sum = sum + n
+    n = n - 1
+}
+println(sum)
+// Expected: 6

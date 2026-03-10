@@ -1,0 +1,4 @@
+// Test 127: unary minus on Float64
+println(-3.5)
+println(-(0.25))
+// Expected: -3.5, -0.25

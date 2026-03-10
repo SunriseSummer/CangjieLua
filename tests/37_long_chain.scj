@@ -8,3 +8,4 @@ let f = e + d
 let g = f + e
 let h = g + f
 println(h)
+// Expected: 34.0

@@ -1,0 +1,5 @@
+// Test 99: Int64 literal support (bytecode-level integer)
+let a = 3
+let b = 4
+println(a + b)
+// Expected: 7

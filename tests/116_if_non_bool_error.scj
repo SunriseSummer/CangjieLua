@@ -1,0 +1,6 @@
+// Test 116: if condition must be Bool
+let x = 1
+if (x) {
+    println(1)
+}
+// ExpectError: If condition must be Bool

@@ -1,0 +1,11 @@
+// Test 95: CangjieLua full pipeline
+// Test: variables, arithmetic, println, return all together
+let a = 10.0
+let b = 20.0
+let c = a + b
+println(c)
+let d = c * 2.0
+println(d)
+return d
+// Expected: 30.0, 60.0
+// ExpectedReturn: 60.0

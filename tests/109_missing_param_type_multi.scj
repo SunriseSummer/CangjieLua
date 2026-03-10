@@ -1,0 +1,5 @@
+// Test 109: parser error for missing type annotation in multi-params
+func bad(a: Int64, b) {
+    return a
+}
+// ExpectError: Function parameter 'b' missing type annotation

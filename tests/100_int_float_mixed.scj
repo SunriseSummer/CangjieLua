@@ -1,0 +1,6 @@
+// Test 100: Int64 + Float64 mixed arithmetic auto-promotes to Float64
+func addMix(x: Int64, y: Float64): Float64 {
+    return x + y
+}
+println(addMix(2, 0.5))
+// Expected: 2.5

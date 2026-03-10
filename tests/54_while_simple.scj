@@ -1,6 +1,6 @@
 // Test 54: Simple while loop
 let x = 1.0
-while (x) {
+while (x > 0.0) {
     x = 0.0
 }
 println(x)

@@ -1,7 +1,7 @@
 // Test 62: ADD in loop
 var sum = 0.0
 var count = 1.0
-while (count) {
+while (count > 0.0) {
     sum = sum + count
     count = 0.0
 }

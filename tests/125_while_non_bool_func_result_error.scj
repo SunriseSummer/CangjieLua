@@ -1,0 +1,8 @@
+// Test 125: while condition must be Bool even when coming from function call
+func id(x: Int64): Int64 {
+    return x
+}
+while (id(1)) {
+    println(1)
+}
+// ExpectError: While condition must be Bool

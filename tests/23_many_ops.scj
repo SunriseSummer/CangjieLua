@@ -8,3 +8,4 @@ let f = e * 7
 let g = f - 8
 let h = g / 9
 println(h)
+// Expected: 4.555555555555556

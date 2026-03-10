@@ -1,5 +1,6 @@
 package cangjie_lua.lexer
 
+import cangjie_lua.errors.*
 import std.convert.*
 import std.collection.*
 
@@ -16,12 +17,16 @@ let CHAR_RPAREN:    Byte = 0x29u8  // ')'
 let CHAR_STAR:      Byte = 0x2Au8  // '*'
 let CHAR_PLUS:      Byte = 0x2Bu8  // '+'
 let CHAR_COMMA:     Byte = 0x2Cu8  // ','
+let CHAR_COLON:     Byte = 0x3Au8  // ':'
 let CHAR_MINUS:     Byte = 0x2Du8  // '-'
 let CHAR_DOT:       Byte = 0x2Eu8  // '.'
 let CHAR_SLASH:     Byte = 0x2Fu8  // '/'
+let CHAR_EXCLAM:    Byte = 0x21u8  // '!'
 let CHAR_0:         Byte = 0x30u8  // '0'
 let CHAR_9:         Byte = 0x39u8  // '9'
 let CHAR_EQUALS:    Byte = 0x3Du8  // '='
+let CHAR_LT:        Byte = 0x3Cu8  // '<'
+let CHAR_GT:        Byte = 0x3Eu8  // '>'
 let CHAR_UPPER_A:   Byte = 0x41u8  // 'A'
 let CHAR_UPPER_Z:   Byte = 0x5Au8  // 'Z'
 let CHAR_UNDERSCORE:Byte = 0x5Fu8  // '_'
@@ -40,6 +45,11 @@ public class Lexer {
     private var pos: Int64 = 0           // 当前扫描位置
     private var line: Int64 = 1          // 当前行号（用于错误报告）
     private var currentByte: Byte = CHAR_NUL  // 当前字节
+    private var _error: ?CompileError = None
+
+    public prop error: ?CompileError {
+        get() { _error }
+    }
 
     public init(source: String) {
         this.source = ArrayList<Byte>(source.toArray())
@@ -84,13 +94,22 @@ public class Lexer {
     }
 
     /// 读取数字字面量（整数或浮点数）
-    private func readNumber(): Token {
+    private func readNumber(): ?Token {
         var text = ""
         let startLine = line
+        var dotCount = 0
 
         while ((currentByte >= CHAR_0 && currentByte <= CHAR_9) || currentByte == CHAR_DOT) {
+            if (currentByte == CHAR_DOT) {
+                dotCount++
+            }
             text = text + String.fromUtf8(currentByte)
             advance()
+        }
+
+        if (dotCount > 1 || text == ".") {
+            _error = CompileError(ErrorStage.LEXER, "Invalid number literal '${text}'", startLine)
+            return None
         }
 
         let value = Float64.parse(text)
@@ -120,6 +139,8 @@ public class Lexer {
         if (text == "while") { return TokenType.WHILE }
         if (text == "func") { return TokenType.FUNC }
         if (text == "return") { return TokenType.RETURN }
+        if (text == "true") { return TokenType.TRUE }
+        if (text == "false") { return TokenType.FALSE }
         return TokenType.IDENTIFIER
     }
 
@@ -141,7 +162,7 @@ public class Lexer {
     }
 
     /// 获取下一个 Token（词法分析核心方法）
-    public func nextToken(): Token {
+    public func nextToken(): ?Token {
         while (currentByte != CHAR_NUL) {
             skipWhitespace()
             skipComment()
@@ -211,27 +232,71 @@ public class Lexer {
                 advance()
                 return Token(TokenType.COMMA, ",", startLine)
             }
+            if (b == CHAR_COLON) {
+                advance()
+                return Token(TokenType.COLON, ":", startLine)
+            }
             if (b == CHAR_EQUALS) {
+                if (peek() == CHAR_EQUALS) {
+                    advance()
+                    advance()
+                    return Token(TokenType.EQEQ, "==", startLine)
+                }
                 advance()
                 return Token(TokenType.ASSIGN, "=", startLine)
             }
+            if (b == CHAR_EXCLAM) {
+                if (peek() == CHAR_EQUALS) {
+                    advance()
+                    advance()
+                    return Token(TokenType.NEQ, "!=", startLine)
+                }
+                let bad = String.fromUtf8(currentByte)
+                _error = CompileError(ErrorStage.LEXER, "Unexpected character '${bad}'", line)
+                return None
+            }
+            if (b == CHAR_LT) {
+                if (peek() == CHAR_EQUALS) {
+                    advance()
+                    advance()
+                    return Token(TokenType.LTE, "<=", startLine)
+                }
+                advance()
+                return Token(TokenType.LT, "<", startLine)
+            }
+            if (b == CHAR_GT) {
+                if (peek() == CHAR_EQUALS) {
+                    advance()
+                    advance()
+                    return Token(TokenType.GTE, ">=", startLine)
+                }
+                advance()
+                return Token(TokenType.GT, ">", startLine)
+            }
 
-            advance()
-            throw Exception("Unexpected character at line ${line}")
+            let bad = String.fromUtf8(currentByte)
+            _error = CompileError(ErrorStage.LEXER, "Unexpected character '${bad}'", line)
+            return None
         }
 
         return Token(TokenType.EOF, "", line)
     }
 
     /// 将整个源码一次性分词为 Token 列表（以 EOF 结尾）
-    public func tokenize(): ArrayList<Token> {
+    public func tokenize(): ?ArrayList<Token> {
+        _error = None
         var tokens = ArrayList<Token>()
-        var token = nextToken()
-        while (token.tokenType != TokenType.EOF) {
-            tokens.add(token)
-            token = nextToken()
+        while (true) {
+            match (nextToken()) {
+                case Some(token) =>
+                    tokens.add(token)
+                    if (token.tokenType == TokenType.EOF) {
+                        return tokens
+                    }
+                case None =>
+                    return None
+            }
         }
-        tokens.add(token)
-        return tokens
+        return None  // unreachable
     }
 }

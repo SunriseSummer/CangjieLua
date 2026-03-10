@@ -1,0 +1,8 @@
+// Test 114: int comparison operators
+println(3 < 5)
+println(3 <= 3)
+println(5 > 3)
+println(5 >= 5)
+println(5 == 5)
+println(5 != 4)
+// Expected: true, true, true, true, true, true

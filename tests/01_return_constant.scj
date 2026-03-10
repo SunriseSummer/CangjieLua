@@ -1,3 +1,4 @@
 // Test 01: Return constant
 // Test: basic return statement with constant
 return 42
+// ExpectedReturn: 42.0

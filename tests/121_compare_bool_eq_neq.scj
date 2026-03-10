@@ -1,0 +1,5 @@
+// Test 121: bool equality and inequality
+println(true == true)
+println(true != false)
+println(false == true)
+// Expected: true, true, false

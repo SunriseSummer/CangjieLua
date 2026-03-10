@@ -1,0 +1,7 @@
+// Test 112: if condition with Bool false should not enter then-branch
+let f = false
+if (f) {
+    println(9)
+}
+println(2)
+// Expected: 2

@@ -1,0 +1,6 @@
+// Test 115: mixed int/float comparison with int promoted to float
+println(3 < 3.5)
+println(3.0 == 3)
+println(2 != 2.0)
+println(2.5 > 2)
+// Expected: true, true, false, true

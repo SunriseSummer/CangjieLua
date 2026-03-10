@@ -1,6 +1,6 @@
 // Test 49: If then continue
 let x = 10.0
-if (5.0) {
+if (5.0 != 0.0) {
     x = 20.0
 }
 println(x)

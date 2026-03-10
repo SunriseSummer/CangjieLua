@@ -1,6 +1,6 @@
 // Test 41: Function - Task Case 4
 // Test: Proto structure generation, function stack frame setup, CALL and RETURN instructions
-func calculateArea(radius) {
+func calculateArea(radius: Float64) {
     let pi = 3.14
     return pi * radius * radius
 }

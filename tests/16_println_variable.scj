@@ -1,3 +1,4 @@
 // Test 16: Println variable
 let x = 100
 println(x)
+// Expected: 100.0

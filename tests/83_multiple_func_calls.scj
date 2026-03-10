@@ -1,5 +1,5 @@
 // Test 83: Multiple function calls
-func inc(x) {
+func inc(x: Float64) {
     return x + 1.0
 }
 let a = inc(0.0)

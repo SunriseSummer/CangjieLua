@@ -1,0 +1,13 @@
+// Test 96: Complex program with func, if, while, println
+func sumUpTo(n: Float64) {
+    var total = 0.0
+    var i = n
+    while (i > 0.0) {
+        total = total + i
+        i = i - 1.0
+    }
+    return total
+}
+let result = sumUpTo(10.0)
+println(result)
+// Expected: 55.0

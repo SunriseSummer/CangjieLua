@@ -3,3 +3,7 @@ let x = 1
 let y = 2
 println(x)
 return y
+// Expected: 1.0
+// ExpectedReturn: 2.0
+// Expected: 1.0
+// ExpectedReturn: 2.0

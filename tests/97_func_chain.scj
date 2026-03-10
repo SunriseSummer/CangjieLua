@@ -1,0 +1,10 @@
+// Test 97: Multiple functions calling each other
+func double(x: Float64) {
+    return x * 2.0
+}
+func quadruple(x: Float64) {
+    return double(double(x))
+}
+println(quadruple(3.0))
+println(double(5.0))
+// Expected: 12.0, 10.0

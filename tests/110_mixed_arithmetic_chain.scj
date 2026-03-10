@@ -1,0 +1,6 @@
+// Test 110: Int64 and Float64 mixed arithmetic chain
+let a = 2
+let b = 0.5
+let c = a + b + a
+println(c)
+// Expected: 4.5

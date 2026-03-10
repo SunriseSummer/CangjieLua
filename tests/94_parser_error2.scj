@@ -1,0 +1,4 @@
+// Test 94: Parser error - missing assignment value
+// Test: error handling for incomplete variable declaration
+let x =
+// ExpectError: Unexpected token ''

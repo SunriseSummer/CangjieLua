@@ -1,3 +1,4 @@
 // Test 02: Simple arithmetic
 // Test: addition, subtraction, multiplication, division
 return 1 + 2
+// ExpectedReturn: 3.0

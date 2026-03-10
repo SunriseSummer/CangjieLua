@@ -1,5 +1,5 @@
 // Test 80: Function with multiple parameters
-func add(a, b) {
+func add(a: Float64, b: Float64) {
     return a + b
 }
 let result = add(3.0, 7.0)

@@ -1,0 +1,9 @@
+// Test 102: Bool variable and Bool-typed function argument
+func choose(flag: Bool): Int64 {
+    return 1
+}
+let t = true
+let f = false
+println(choose(t))
+println(choose(f))
+// Expected: 1.0, 1.0

@@ -1,0 +1,5 @@
+// Test 122: negative mixed numeric comparisons (via expressions)
+println((0 - 1) < (0 - 0.5))
+println((0 - 1.0) >= (0 - 1))
+println((0 - 2) > (0 - 1.5))
+// Expected: true, true, false

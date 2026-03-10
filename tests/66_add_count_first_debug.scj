@@ -1,7 +1,7 @@
 // Test 66: ADD in loop - count first - with debug
 var count = 5.0
 var sum = 0.0
-while (count) {
+while (count > 0.0) {
     println(sum)
     println(count)
     sum = sum + count

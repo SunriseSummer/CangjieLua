@@ -1,5 +1,5 @@
 // Test 85: Function used in expression
-func triple(x) {
+func triple(x: Float64) {
     return x * 3.0
 }
 let result = triple(4.0) + 1.0

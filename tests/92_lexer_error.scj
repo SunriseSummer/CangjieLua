@@ -1,0 +1,4 @@
+// Test 92: Lexer error - unexpected character
+// Test: error handling for invalid characters
+let x = 10 @ 5
+// ExpectError: Unexpected character '@'

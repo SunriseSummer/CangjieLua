@@ -1,0 +1,6 @@
+// Test 120: mixed int/float equality and inequality
+println(3 == 3.0)
+println(3 != 3.0)
+println(2.5 == 2)
+println(2.5 != 2)
+// Expected: true, false, false, true

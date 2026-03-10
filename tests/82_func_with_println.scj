@@ -1,5 +1,5 @@
 // Test 82: Function with println inside
-func greet(x) {
+func greet(x: Float64) {
     println(x)
 }
 greet(42.0)

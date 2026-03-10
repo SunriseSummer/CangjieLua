@@ -1,0 +1,10 @@
+// Test 123: function Bool return used as if condition
+func isPositive(x: Float64): Bool {
+    return x > 0.0
+}
+if (isPositive(1.0)) {
+    println(1)
+} else {
+    println(0)
+}
+// Expected: 1

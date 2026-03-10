@@ -10,3 +10,4 @@ let h = g + 1
 let i = h + 1
 let j = i + 1
 println(j)
+// Expected: 10.0

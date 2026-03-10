@@ -1,0 +1,7 @@
+// Test 113: while condition with Bool false should not enter loop
+let f = false
+while (f) {
+    println(9)
+}
+println(2)
+// Expected: 2

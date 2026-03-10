@@ -4,3 +4,4 @@ let a = 10.5
 let b = 2.0
 let c = a * b + 4.0 / 2.0
 println(c)
+// Expected: 23.0

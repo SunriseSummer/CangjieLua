@@ -1,6 +1,6 @@
 // Test 58: While count down
 var count = 3.0
-while (count) {
+while (count > 0.0) {
     println(count)
     count = count - 1.0
 }

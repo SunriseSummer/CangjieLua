@@ -1,0 +1,4 @@
+// Test 129: chained unary minus
+println(--5)
+println(-(-3.0))
+// Expected: 5, 3.0
