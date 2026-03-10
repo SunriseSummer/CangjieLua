@@ -310,7 +310,7 @@ println(result)
 
 **实现提示**：
 1. 当前解析器中 `else` 后可能已经部分支持 `if`，检查 `parseIfStmt()` 中 else 分支是否递归调用 `parseIfStmt()`
-2. 如果尚未支持，修改 else 解析：当 else 后面紧跟 `if` 关键字时，递归解析为新的 if 语句
+2. 如果尚未支持，修改 else 解析：当 else 后面紧跟 `if` 关键字时，递归解析为新的 if 表达式
 3. 代码生成器不需要修改——嵌套的 if 自然会生成正确的 JMP 链
 
 ---
@@ -350,7 +350,7 @@ println(sum)
 
 **分值**：10 分
 
-**特性描述**：支持按位取反运算符。
+**特性描述**：支持整数（Int64）按位取反运算符 `~`。
 
 **示例代码**：
 ```cangjie
@@ -361,7 +361,7 @@ println(~1)
 
 **实现提示**：
 1. **词法分析器**：添加 `TILDE`（`~`）token
-2. **解析器**：在 `parseUnary()` 中处理 `~`
+2. **解析器**：在 `parseUnary()` 中处理 `~`，操作数必须为整数类型
 3. **代码生成器**：使用 `BNOT` 指令（OpCode 50）：`BNOT A B` → `R[A] := ~R[B]`
 
 ---
@@ -370,7 +370,7 @@ println(~1)
 
 **分值**：10 分
 
-**特性描述**：支持获取字符串长度的运算符。仓颉语言中字符串长度通过 `.size` 属性或 `count()` 方法获取，但这里可以先实现为 `#` 前缀运算符（与 Lua 一致）或自定义的方法调用形式。
+**特性描述**：支持获取字符串长度。仓颉语言中通过 `.size` 属性获取字符串长度。
 
 **示例代码**：
 ```cangjie
@@ -379,7 +379,7 @@ println(s.size)
 // Expected: 5
 ```
 
-**实现提示**（如果实现为属性访问形式）：
+**实现提示**：
 1. **词法分析器**：添加 `DOT`（`.`）token
 2. **AST**：添加 `PropertyAccess(Box<Expr>, String)` 表达式
 3. **解析器**：在 `parsePrimary()` 后处理 `.identifier` 后缀
@@ -479,7 +479,7 @@ println(arr[1])
 ```
 
 **实现提示**：
-1. **AST**：添加 `IndexAssignment(Box<Expr>, Box<Expr>, Expr)` 语句
+1. **AST**：添加 `IndexAssignment(Box<Expr>, Box<Expr>, Expr)` 表达式
 2. **解析器**：在赋值解析中识别 `identifier[expr] = expr` 模式
 3. **代码生成器**：使用 `SETI` 指令（OpCode 17）或 `SETTABLE`
 
@@ -515,34 +515,7 @@ println(add(3, 4))
 
 ---
 
-### 任务 20：类型检查增强 ⭐⭐⭐
-
-**分值**：30 分
-
-**特性描述**：增强编译期类型检查，防止类型不匹配的操作。
-
-**示例代码**：
-```cangjie
-let x: Int64 = "hello"
-// ExpectError: type mismatch
-```
-
-```cangjie
-func add(a: Int64, b: Int64): Int64 {
-    return a + b
-}
-add(1, "hello")
-// ExpectError: type mismatch
-```
-
-**实现提示**：
-1. 在解析器或代码生成器中添加类型推断逻辑
-2. 检查赋值和函数调用时的类型兼容性
-3. 生成友好的错误信息
-
----
-
-### 任务 21：let 不可变检查 ⭐⭐
+### 任务 20：let 不可变检查 ⭐⭐
 
 **分值**：20 分
 
@@ -565,7 +538,7 @@ x = 20
 
 ---
 
-### 任务 22：作用域与变量遮蔽 ⭐⭐⭐
+### 任务 21：作用域与变量遮蔽 ⭐⭐⭐
 
 **分值**：30 分
 
@@ -594,7 +567,7 @@ println(x)
 
 ---
 
-### 任务 23：嵌套函数与闭包 ⭐⭐⭐⭐
+### 任务 22：嵌套函数与闭包 ⭐⭐⭐⭐
 
 **分值**：40 分
 
@@ -624,7 +597,7 @@ func makeCounter() {
 
 ---
 
-### 任务 24：递归函数调用 ⭐⭐
+### 任务 23：递归函数调用 ⭐⭐
 
 **分值**：20 分
 
@@ -654,11 +627,11 @@ println(fib(10.0))
 
 ---
 
-### 任务 25：尾调用优化 ⭐⭐⭐
+### 任务 24：尾调用优化 ⭐⭐⭐
 
 **分值**：30 分
 
-**特性描述**：当函数的最后一条语句是函数调用时，使用尾调用优化。
+**特性描述**：尾调用（Tail Call）是指函数的最后一个求值表达式是一个函数调用。在这种情况下，当前函数的栈帧可以被复用，不需要额外分配新的栈帧，从而避免栈溢出。尾调用优化使得递归算法可以在常量栈空间内执行，等效于循环。
 
 **示例代码**：
 ```cangjie
@@ -673,42 +646,45 @@ println(loop(10000.0, 0.0))
 ```
 
 **期望效果**：
+- 当函数的最后一个求值表达式是函数调用时，使用尾调用优化
 - 尾调用不增加调用栈深度
 - 大递归深度不会栈溢出
 
 **实现提示**：
-1. 在代码生成器中检测：`ReturnStmt(Call(...))` 模式
+1. 在代码生成器中检测：`Return(Call(...))` 模式——即 return 表达式的求值内容是函数调用
 2. 使用 `TAILCALL` 指令（OpCode 69）替代 `CALL` + `RETURN`
 3. `TAILCALL A B C k`：调用 R[A] 并直接返回结果
 
 ---
 
-### 任务 26：默认参数值 ⭐⭐⭐
+### 任务 25：默认参数值 ⭐⭐⭐
 
 **分值**：30 分
 
-**特性描述**：支持函数参数的默认值。
+**特性描述**：支持函数命名参数的默认值。仓颉语言中只有命名参数才能设置默认值，命名参数使用 `参数名!: 类型 = 默认值` 语法。
 
 **示例代码**：
 ```cangjie
-func greet(name: String, greeting: String = "Hello") {
+func greet(name: String, greeting!: String = "Hello") {
     println(greeting)
     println(name)
 }
 greet("World")
-greet("World", "Hi")
+greet("World", greeting: "Hi")
 // Expected: Hello, World, Hi, World
 ```
 
 **实现提示**：
-1. **解析器**：函数参数支持 `= defaultValue` 后缀
-2. **AST**：`FuncParam` 添加 `defaultValue: ?Expr` 字段
-3. **代码生成器**：在函数入口检查参数是否为 nil，如果是则使用默认值
-4. Lua 层面：对每个有默认值的参数，生成 `TEST + JMP + LOADK` 序列
+1. **词法分析器**：添加 `BANG`（`!`）token 用于命名参数标记
+2. **解析器**：函数参数识别 `name!: Type = defaultValue` 语法，支持命名参数
+3. **AST**：`FuncParam` 添加 `isNamed: Bool` 和 `defaultValue: ?Expr` 字段
+4. **代码生成器**：在函数入口检查命名参数是否为 nil，如果是则使用默认值
+5. Lua 层面：对每个有默认值的参数，生成 `TEST + JMP + LOADK` 序列
+6. 调用时支持 `funcName(positionalArgs, namedParam: value)` 语法
 
 ---
 
-### 任务 27：println 多参数 ⭐⭐
+### 任务 26：println 多参数 ⭐⭐
 
 **分值**：20 分
 
@@ -729,7 +705,7 @@ println("sum:", 1 + 2)
 
 ---
 
-### 任务 28：print 函数（不换行） ⭐
+### 任务 27：print 函数（不换行） ⭐
 
 **分值**：10 分
 
@@ -749,7 +725,7 @@ println("world")
 
 ---
 
-### 任务 29：字符串插值 ⭐⭐⭐
+### 任务 28：字符串插值 ⭐⭐⭐
 
 **分值**：30 分
 
@@ -773,11 +749,11 @@ println("Hello ${name}, x = ${x}")
 
 ---
 
-### 任务 30：break 语句 ⭐⭐
+### 任务 29：break 表达式 ⭐⭐
 
 **分值**：20 分
 
-**特性描述**：在 while 循环中支持 break 语句，跳出循环。
+**特性描述**：在 while 循环中支持 break 表达式，跳出循环。
 
 **示例代码**：
 ```cangjie
@@ -794,7 +770,7 @@ println(i)
 
 **实现提示**：
 1. **词法分析器**：添加 `BREAK` 关键字
-2. **AST**：添加 `BreakStmt` 语句节点
+2. **AST**：添加 `BreakExpr` 表达式节点
 3. **代码生成器**：
    - 维护循环上下文栈，记录当前循环的退出点
    - break 生成 `JMP` 指令，跳转目标需要回填
@@ -802,11 +778,11 @@ println(i)
 
 ---
 
-### 任务 31：continue 语句 ⭐⭐
+### 任务 30：continue 表达式 ⭐⭐
 
 **分值**：20 分
 
-**特性描述**：在 while 循环中支持 continue 语句，跳到循环条件检查。
+**特性描述**：在 while 循环中支持 continue 表达式，跳到循环条件检查。
 
 **示例代码**：
 ```cangjie
@@ -825,14 +801,14 @@ println(sum)
 
 **实现提示**：
 1. **词法分析器**：添加 `CONTINUE` 关键字
-2. **AST**：添加 `ContinueStmt` 语句节点
+2. **AST**：添加 `ContinueExpr` 表达式节点
 3. **代码生成器**：
    - continue 生成 `JMP` 指令，跳转到循环开头
    - 跳转偏移量 = loopStart - currentPC - 1（负偏移）
 
 ---
 
-### 任务 32：多变量声明 ⭐⭐
+### 任务 31：多变量声明 ⭐⭐
 
 **分值**：20 分
 
@@ -854,33 +830,36 @@ println(c)
 
 ---
 
-### 任务 33：全局函数库扩展 ⭐⭐
+### 任务 32：类型转换表达式 ⭐⭐
 
 **分值**：20 分
 
-**特性描述**：注册更多内置函数到全局环境。
+**特性描述**：支持仓颉语言的类型转换语法，在不同数值类型之间进行转换。
 
 **示例代码**：
 ```cangjie
-println(toInt64(3.7))
-println(toFloat64(42))
-println(toString(100))
-// Expected: 3, 42.0, 100
+let a: Float64 = Float64(42)
+let b: Int64 = Int64(3.7)
+println(a)
+println(b)
+// Expected: 42.0, 3
 ```
 
 **期望效果**：
-- `toInt64(x)`：将值转换为整数
-- `toFloat64(x)`：将值转换为浮点数
-- `toString(x)`：将值转换为字符串
+- `Int64(expr)`：将值转换为整数（浮点数截断小数部分）
+- `Float64(expr)`：将值转换为浮点数
 
 **实现提示**：
-1. 在 `cangjie_lua.cj` 中，类似 `println` 的注册方式，用 `lua_pushcclosure` + `lua_setglobal` 注册新的 C 函数
-2. 每个函数从 Lua 栈上获取参数，进行类型转换，将结果压入栈
-3. 可以直接调用 Lua 的标准库函数（`tonumber`、`tostring` 等），或自行实现
+1. **解析器**：识别 `TypeName(expr)` 模式，将其解析为类型转换表达式
+2. **AST**：添加 `TypeCast(String, Box<Expr>)` 表达式节点，存储目标类型名和被转换的表达式
+3. **代码生成器**：
+   - `Int64()` 转换：先计算表达式，如果是浮点数则需要使用整数截断逻辑
+   - `Float64()` 转换：先计算表达式，如果是整数则转换为浮点数
+   - 可利用 Lua 的 `math.floor` 实现浮点到整数的截断
 
 ---
 
-### 任务 34：复合赋值运算符 ⭐⭐
+### 任务 33：复合赋值运算符 ⭐⭐
 
 **分值**：20 分
 
@@ -907,53 +886,32 @@ println(x)
 
 ---
 
-### 任务 35：HashMap 字面量 ⭐⭐⭐⭐
+### 任务 34：HashMap 字面量 ⭐⭐⭐⭐
 
 **分值**：40 分
 
-**特性描述**：支持键值对字面量和属性访问。使用 Lua table 的哈希部分实现。
+**特性描述**：支持键值对集合的创建和访问。使用 Lua table 的哈希部分实现。
 
 **示例代码**：
 ```cangjie
-let m = {"name": "Alice", "age": 30}
+let m = HashMap<String, Int64>([("name", 1), ("age", 30)])
 println(m["name"])
 println(m["age"])
-// Expected: Alice, 30
+// Expected: 1, 30
 ```
 
 **实现提示**：
-1. **词法分析器**：复用 `{}`、添加字符串键支持
-2. **AST**：添加 `MapLiteral(ArrayList<(Expr, Expr)>)` 表达式
-3. **代码生成器**：
+1. **词法分析器**：添加 `LBRACKET`（`[`）和 `RBRACKET`（`]`）token，支持 `<` `>` 用于泛型
+2. **AST**：添加 `HashMapLiteral(ArrayList<(Expr, Expr)>)` 表达式，表示键值对列表
+3. **解析器**：识别 `HashMap<K, V>([(key, value), ...])` 构造语法
+4. **代码生成器**：
    - `NEWTABLE` 创建表，指定哈希部分大小
    - `SETFIELD` 设置字符串键的值
    - `GETFIELD` 获取字符串键的值
 
 ---
 
-### 任务 36：方法调用语法 ⭐⭐⭐
-
-**分值**：30 分
-
-**特性描述**：支持 `obj.method(args)` 形式的方法调用。
-
-**示例代码**：
-```cangjie
-// 假设有一个数学库的封装
-let x = -5
-println(x.abs())
-// Expected: 5
-```
-
-**实现提示**：
-1. **AST**：添加 `MethodCall(Box<Expr>, String, ArrayList<Expr>)` 表达式
-2. **代码生成器**：
-   - 对于已知对象类型的方法，可以直接生成对应指令
-   - 通用方法调用使用 `SELF` 指令（OpCode 20）：准备 self 和方法引用
-
----
-
-### 任务 37：错误处理 try-catch ⭐⭐⭐⭐
+### 任务 35：错误处理 try-catch ⭐⭐⭐⭐
 
 **分值**：40 分
 
@@ -977,7 +935,7 @@ func divide(a: Float64, b: Float64): Float64 {
 
 ---
 
-### 任务 38：lambda 表达式 ⭐⭐⭐
+### 任务 36：lambda 表达式 ⭐⭐⭐
 
 **分值**：30 分
 
@@ -1001,7 +959,7 @@ println(double(5.0))
 
 ---
 
-### 任务 39：高阶函数 ⭐⭐⭐
+### 任务 37：高阶函数 ⭐⭐⭐
 
 **分值**：30 分
 
@@ -1027,39 +985,16 @@ println(apply(square, 5.0))
 
 ---
 
-### 任务 40：标准数学函数 ⭐⭐
-
-**分值**：20 分
-
-**特性描述**：将 Lua 数学库的常用函数注册为仓颉全局函数。
-
-**示例代码**：
-```cangjie
-println(sqrt(16.0))
-println(abs(-5))
-println(max(3, 7))
-println(min(3, 7))
-// Expected: 4.0, 5, 7, 3
-```
-
-**实现提示**：
-1. Lua 标准库已包含 `math.sqrt`、`math.abs` 等函数
-2. 方法一：在 `cangjie_lua.cj` 中用 Lua 代码将 math 库函数提升到全局
-3. 方法二：注册 C 函数包装器
-4. 方法三：执行一段初始化 Lua 代码：`sqrt = math.sqrt`
-
----
-
 ## 分数统计
 
 | 难度 | 数量 | 单任务分值 | 小计 |
 |------|------|----------|------|
-| ⭐ (简单) | 8 个 | 10 分 | 80 分 |
-| ⭐⭐ (中等) | 14 个 | 20 分 | 280 分 |
-| ⭐⭐⭐ (较难) | 11 个 | 30 分 | 330 分 |
+| ⭐ (简单) | 9 个 | 10 分 | 90 分 |
+| ⭐⭐ (中等) | 15 个 | 20 分 | 300 分 |
+| ⭐⭐⭐ (较难) | 9 个 | 30 分 | 270 分 |
 | ⭐⭐⭐⭐ (困难) | 4 个 | 40 分 | 160 分 |
-| ⭐⭐⭐⭐⭐ (极难) | 3 个（附加任务） | 50 分 | 150 分 |
-| **总计** | **40 个** | | **1000 分** |
+| ⭐⭐⭐⭐⭐ (极难) | 5 个（附加任务） | 50 分 | 250 分 |
+| **总计** | **42 个** | | **1070 分** |
 
 ---
 
@@ -1084,12 +1019,14 @@ class Point {
         this.y = y
     }
 
-    func distanceTo(other: Point): Float64 {
-        let dx = this.x - other.x
-        let dy = this.y - other.y
-        return sqrt(dx * dx + dy * dy)
+    func getX(): Float64 {
+        return this.x
     }
 }
+
+let p = Point(3.0, 4.0)
+println(p.getX())
+// Expected: 3.0
 ```
 
 **实现提示**：
@@ -1098,11 +1035,52 @@ class Point {
 - 方法通过 SELF 指令调用
 - `this` 对应 Lua 的 `self`
 
-### 附加任务 B：模式匹配 match ⭐⭐⭐⭐⭐
+### 附加任务 B：类的继承和多态 ⭐⭐⭐⭐⭐
 
 **分值**：50 分
 
-**特性描述**：支持仓颉语言的 match 表达式。
+**特性描述**：在简单类定义的基础上，支持类的继承（`<:`）和方法重写（多态）。
+
+**示例代码**：
+```cangjie
+open class Animal {
+    var name: String
+
+    init(name: String) {
+        this.name = name
+    }
+
+    func speak(): String {
+        return "..."
+    }
+}
+
+class Dog <: Animal {
+    init(name: String) {
+        super(name)
+    }
+
+    func speak(): String {
+        return "Woof"
+    }
+}
+
+let d = Dog("Rex")
+println(d.speak())
+// Expected: Woof
+```
+
+**实现提示**：
+- 使用 Lua metatable 链实现继承：子类的元表的 `__index` 指向父类的元表
+- 方法重写：子类元表中覆盖父类方法
+- `super` 调用：通过保存父类引用实现
+- `open` 关键字标记类是否允许被继承
+
+### 附加任务 C：模式匹配 match ⭐⭐⭐⭐⭐
+
+**分值**：50 分
+
+**特性描述**：支持仓颉语言的 match 表达式，包含常量模式和通配符模式。常量模式匹配具体值（整数、浮点数、布尔值、字符串等），通配符模式 `_` 匹配任意值作为默认分支。
 
 **示例代码**：
 ```cangjie
@@ -1117,24 +1095,70 @@ println(describe(1.0))
 // Expected: one
 ```
 
-### 附加任务 C：协程支持 ⭐⭐⭐⭐⭐
+**实现提示**：
+1. **词法分析器**：添加 `MATCH`、`CASE`、`ARROW`（`=>`）、`UNDERSCORE`（`_`）token
+2. **AST**：添加 `MatchExpr(Box<Expr>, ArrayList<MatchArm>)` 表达式，`MatchArm` 包含模式和分支体
+3. **代码生成器**：
+   - 常量模式：使用 `EQ`/`EQK`/`EQI` 指令依次比较，不匹配则跳到下一个 case
+   - 通配符模式 `_`：无条件执行分支体（作为默认 fallthrough）
+   - 每个 case 分支结束后 `JMP` 跳到 match 表达式末尾
+
+### 附加任务 D：extend 扩展 ⭐⭐⭐⭐⭐
 
 **分值**：50 分
 
-**特性描述**：利用 Lua 协程实现简单的并发原语。
+**特性描述**：支持仓颉语言的 `extend` 特性，为已有类型添加新方法，而不修改原始类型定义。
 
 **示例代码**：
 ```cangjie
-func producer() {
-    var i = 1.0
-    while (i <= 3.0) {
-        yield(i)
-        i = i + 1.0
+extend Int64 {
+    func isEven(): Bool {
+        return this % 2 == 0
     }
 }
+
+let x = 4
+println(x.isEven())
+// Expected: true
 ```
 
 **实现提示**：
-- 使用 Lua 的 coroutine 库
-- `yield` 对应 `coroutine.yield`
-- 需要添加 FFI 接口：`lua_resume`、`lua_yieldk`
+- 使用 Lua metatable 为已有类型附加方法
+- 需要为基础类型（Int64、Float64、String 等）建立 metatable 系统
+- `this` 绑定到调用方法的值
+- extend 块中的方法注册到对应类型的 metatable 的 `__index` 表中
+
+### 附加任务 E：interface 接口 ⭐⭐⭐⭐⭐
+
+**分值**：50 分
+
+**特性描述**：支持仓颉语言的 `interface` 特性，定义接口并让类实现接口。
+
+**示例代码**：
+```cangjie
+interface Printable {
+    func display(): String
+}
+
+class User <: Printable {
+    var name: String
+
+    init(name: String) {
+        this.name = name
+    }
+
+    func display(): String {
+        return this.name
+    }
+}
+
+let u = User("Alice")
+println(u.display())
+// Expected: Alice
+```
+
+**实现提示**：
+- interface 定义为方法签名集合（仅声明，无实现）
+- 在编译期检查类是否实现了接口要求的所有方法
+- 使用 Lua metatable 机制，接口约束在编译期验证
+- 类通过 `<:` 声明实现接口，与继承语法统一
