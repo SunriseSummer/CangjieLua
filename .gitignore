@@ -13,8 +13,8 @@ luavm/src/Makefile
 luavm/src/lua
 luavm/src/liblua.a
 luavm/src/libluavm_static.a
-luavm/src/libluavm.so.5
-luavm/src/libluavm.so.5.5
+luavm/src/libluavm.so
+luavm/src/libluavm.so.*
 
 # Cangjie SDK (downloaded)
 cangjie/
