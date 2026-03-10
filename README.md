@@ -6,6 +6,20 @@
 
 ---
 
+## 竞赛扩展文档
+
+- [LuaVM 接口与字节码说明](luavm/luavm.md)
+- [AI 编程大赛任务书](task.md)
+- [参赛扩展开发指南](docs/contest-guide.md)
+
+如需刷新上述文档或校验文档示例，请先完成 `cjpm build`，然后执行：
+
+```bash
+python3 scripts/competition_docs.py check
+```
+
+---
+
 ## 1. 项目定位
 
 CangjieLua 不是“逐条解释执行 AST”的传统解释器，而是采用 **前端编译 + 字节码执行** 的路线：

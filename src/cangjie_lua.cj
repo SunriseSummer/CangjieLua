@@ -51,7 +51,7 @@ public class CangjieLua {
         get() { _error }
     }
 
-    private func compileToBytecode(source: String): ?Array<UInt8> {
+    public func compileToBytecode(source: String): ?Array<UInt8> {
         let lexer = Lexer(source)
         let tokens = match (lexer.tokenize()) {
             case Some(v) => v
