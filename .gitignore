@@ -3,6 +3,7 @@ target/
 build/
 *.o
 *.a
+cjpm.lock
 
 # CMake
 luavm/src/CMakeCache.txt
@@ -12,6 +13,8 @@ luavm/src/Makefile
 luavm/src/lua
 luavm/src/liblua.a
 luavm/src/libluavm_static.a
+luavm/src/libluavm.so.5
+luavm/src/libluavm.so.5.5
 
 # Cangjie SDK (downloaded)
 cangjie/
