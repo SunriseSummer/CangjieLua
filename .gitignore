@@ -1,0 +1,28 @@
+# Build artifacts
+target/
+build/
+*.o
+*.a
+
+# CMake
+luavm/src/CMakeCache.txt
+luavm/src/CMakeFiles/
+luavm/src/cmake_install.cmake
+luavm/src/Makefile
+luavm/src/lua
+luavm/src/liblua.a
+luavm/src/libluavm_static.a
+
+# Cangjie SDK (downloaded)
+cangjie/
+cangjie-sdk-*.tar.gz
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
