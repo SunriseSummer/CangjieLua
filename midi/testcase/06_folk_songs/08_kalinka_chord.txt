@@ -1,0 +1,9 @@
+// 卡林卡 — 和弦
+TEMPO 140
+INSTRUMENT guitar
+E4 16  F4 16  E4 16  D4 16  E4 16  F4 16  G4 16  A4 16
+[A2 E3 A3 C4] 4  R 8
+E4 8  A4 8  B4 8
+[D3 A3 D4 F4] 4  R 8
+A3 8  C4 8  E4 8
+[E3 B3 E4 G#4] 4

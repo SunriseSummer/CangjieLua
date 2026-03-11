@@ -195,7 +195,7 @@ func test6_CastleInSky(): Bool {
         "R 8  A4 8  B4 8  C5 4  B4 8\n" +
         "C5 4  E5 4  B4 2\n" +
         "R 8  E4 8  A4 8  G4 4  E4 8\n" +
-        "G4 4  A4 4  R 4  R 4"
+        "G4 4  A4 2  R 4"
     let data = generate(input)
     if (!verifyMThd(data, 0, 1)) { return false }
     let pitches = extractNoteOnPitches(data)
@@ -413,6 +413,78 @@ func test10_TwinkleVariation(): Bool {
     true
 }
 
+// Testcase 文件批量验证
+func testTestcases(): Bool {
+    let baseDir = Path("testcase")
+    if (!exists(baseDir)) {
+        println("  testcase/ 目录不存在，跳过")
+        return true
+    }
+
+    let themeDirs: Array<String> = [
+        "01_jay_chou", "02_guofeng_opera", "03_classical",
+        "04_movie_themes", "05_christmas", "06_folk_songs",
+        "07_anime", "08_pop_classics", "09_nursery_rhymes",
+        "10_game_music"
+    ]
+
+    var totalOk: Int64 = 0
+    var totalErr: Int64 = 0
+
+    for (theme in themeDirs) {
+        let dirPath = baseDir.join(theme)
+        if (!exists(dirPath)) {
+            println("  ⚠ 目录不存在: ${theme}")
+            totalErr++
+            continue
+        }
+
+        let entries = Directory.readFrom(dirPath)
+        var dirOk: Int64 = 0
+        var dirErr: Int64 = 0
+
+        for (entry in entries) {
+            let name = entry.name
+            if (!name.endsWith(".txt")) { continue }
+
+            try {
+                let bytes = File.readFrom(dirPath.join(name))
+                let input = String.fromUtf8(bytes)
+                let data = generate(input)
+                if (data.size < 14) {
+                    println("    ✗ ${name}: 输出过短")
+                    dirErr++
+                    continue
+                }
+                if (data[0] != 0x4D || data[1] != 0x54 || data[2] != 0x68 || data[3] != 0x64) {
+                    println("    ✗ ${name}: 无效 MThd")
+                    dirErr++
+                    continue
+                }
+                dirOk++
+            } catch (e: Exception) {
+                println("    ✗ ${name}: ${e}")
+                dirErr++
+            }
+        }
+
+        totalOk += dirOk
+        totalErr += dirErr
+        if (dirErr == 0) {
+            println("  ✓ ${theme}: ${dirOk} 个文件全部通过")
+        } else {
+            println("  ✗ ${theme}: ${dirOk} 通过, ${dirErr} 失败")
+        }
+    }
+
+    if (totalErr > 0) {
+        println("  共 ${totalOk + totalErr} 个文件: ${totalOk} 通过, ${totalErr} 失败")
+        return false
+    }
+    println("  🎉 全部 ${totalOk} 个 testcase 文件验证通过！")
+    true
+}
+
 // 主入口
 main(): Int64 {
     println("═══════════════════════════════════════")
@@ -440,6 +512,10 @@ main(): Int64 {
     runTest("8. 🎹 致爱丽丝 — 和弦 [15分]", test8_FurElise)
     runTest("9. 🎂 生日快乐 — 多轨道 [15分]", test9_HappyBirthday)
     runTest("10. 🌟 小星星变奏曲 — 三轨完整编曲 [20分]", test10_TwinkleVariation)
+
+    println()
+    println("── Testcase 文件验证 ──")
+    runTest("📁 Testcase 批量验证 (100 个文件)", testTestcases)
 
     println()
     println("═══════════════════════════════════════")

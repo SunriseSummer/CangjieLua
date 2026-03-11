@@ -1,0 +1,9 @@
+// 探花令 — 和弦
+TEMPO 88
+INSTRUMENT piano
+A4 16  G4 16  A4 16  C5 16  D5 16  C5 16  A4 16  G4 16
+[A2 E3 A3 C4] 4  R 8
+A3 8  C4 8  E4 8
+[D3 A3 D4 F4] 4  R 8
+E3 8  A3 8  C4 8
+[A2 E3 A3 C4 E4] 4

@@ -1,0 +1,3 @@
+// 披头士 Yesterday — 单音测试
+TEMPO 96
+G4 4

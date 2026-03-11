@@ -1,0 +1,7 @@
+// 粉红豹 — 乐器选择
+TEMPO 120
+INSTRUMENT trumpet
+C#4 4  D4 4  E4 4  F4 4
+G4 4  E4 4  D4 4  C#4 4
+D4 4  E4 4  F4 4  D4 4
+C4 4  B3 4  C4 2

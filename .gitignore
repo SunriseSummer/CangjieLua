@@ -32,6 +32,7 @@ Thumbs.db
 
 # Generated MIDI test files
 midi/tests/*.mid
+midi/testcase/**/*.mid
 
 # Cangjie docs (downloaded)
 .cangjie-docs/

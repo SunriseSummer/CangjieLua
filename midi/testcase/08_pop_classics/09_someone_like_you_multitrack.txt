@@ -1,0 +1,20 @@
+// 阿黛尔 Someone Like You — 多轨道
+TEMPO 68
+
+TRACK melody
+INSTRUMENT piano
+E4 4  G4 4  A4 4  B4 4
+A4 4  G4 4  E4 2
+D4 4  E4 4  G4 4  A4 4
+G4 4  E4 4  D4 2
+C4 4  D4 4  E4 4  G4 4
+A4 4  G4 4  E4 2
+D4 4  E4 4  G4 4  A4 4
+G4 4  E4 4  D4 2
+
+TRACK bass
+INSTRUMENT bass
+A2 2  E3 2
+D3 2  A2 2
+C3 2  G2 2
+D3 2  E3 2
