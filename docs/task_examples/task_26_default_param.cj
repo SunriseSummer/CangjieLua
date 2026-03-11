@@ -1,4 +1,4 @@
-// 任务 25：默认参数值
+// 任务 26：默认参数值
 func greet(name: String, greeting!: String = "Hello") {
     println(greeting)
     println(name)

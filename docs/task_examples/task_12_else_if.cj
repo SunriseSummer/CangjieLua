@@ -1,4 +1,4 @@
-// 任务 11：else if 链
+// 任务 12：else if 链
 main() {
     var x = 15
     var result = 0

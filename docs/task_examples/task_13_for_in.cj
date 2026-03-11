@@ -1,4 +1,4 @@
-// 任务 12：for-in 范围循环
+// 任务 13：for-in 范围循环
 main() {
     var sum: Int64 = 0
     for (i in 1..=5) {

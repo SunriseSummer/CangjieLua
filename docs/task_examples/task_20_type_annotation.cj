@@ -1,4 +1,4 @@
-// 任务 19：类型注解增强
+// 任务 20：类型注解增强
 func add(a: Int64, b: Int64): Int64 {
     return a + b
 }

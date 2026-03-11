@@ -1,4 +1,4 @@
-// 任务 22：嵌套函数与闭包
+// 任务 23：嵌套函数与闭包
 func makeAdder(n: Int64): (Int64) -> Int64 {
     return { x: Int64 => x + n }
 }

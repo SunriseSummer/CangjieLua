@@ -1,4 +1,4 @@
-// 任务 27：print 函数（不换行）
+// 任务 28：print 函数（不换行）
 main() {
     print("hello ")
     println("world")

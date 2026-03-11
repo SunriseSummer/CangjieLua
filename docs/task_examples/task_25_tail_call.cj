@@ -1,4 +1,4 @@
-// 任务 24：尾调用优化
+// 任务 25：尾调用优化
 func loop(n: Int64, acc: Int64): Int64 {
     if (n <= 0) {
         return acc
