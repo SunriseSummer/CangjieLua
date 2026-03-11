@@ -29,3 +29,9 @@ cangjie-sdk-*.tar.gz
 # OS
 .DS_Store
 Thumbs.db
+
+# Generated MIDI test files
+midi/tests/*.mid
+
+# Cangjie docs (downloaded)
+.cangjie-docs/
