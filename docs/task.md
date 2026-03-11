@@ -265,7 +265,7 @@ println(c)
 
 **示例代码**：
 ```cangjie
-func swap(a: Float64, b: Float64) {
+func swap(a: Float64, b: Float64): (Float64, Float64) {
     return (b, a)
 }
 let (x, y) = swap(1.0, 2.0)
@@ -579,8 +579,8 @@ println(x)
 
 **示例代码**：
 ```cangjie
-func makeAdder(n: Float64) {
-    func adder(x: Float64) {
+func makeAdder(n: Float64): (Float64) -> Float64 {
+    func adder(x: Float64): Float64 {
         return x + n
     }
     return adder
