@@ -266,9 +266,12 @@ println(c)
 **示例代码**：
 ```cangjie
 func swap(a: Float64, b: Float64) {
-    return a, b
+    return (b, a)
 }
-// 使用多赋值接收（或先实现单返回值，再扩展）
+let (x, y) = swap(1.0, 2.0)
+println(x)
+println(y)
+// Expected: 2.0, 1.0
 ```
 
 **期望效果**：
@@ -576,14 +579,15 @@ println(x)
 
 **示例代码**：
 ```cangjie
-func makeCounter() {
-    var count = 0.0
-    func increment() {
-        count = count + 1.0
-        return count
+func makeAdder(n: Float64) {
+    func adder(x: Float64) {
+        return x + n
     }
-    return increment
+    return adder
 }
+let add5 = makeAdder(5.0)
+println(add5(10.0))
+// Expected: 15.0
 ```
 
 **期望效果**：
@@ -929,6 +933,12 @@ func divide(a: Float64, b: Float64): Float64 {
     }
     return a / b
 }
+try {
+    divide(10.0, 0.0)
+} catch (e) {
+    println(e)
+}
+// Expected: division by zero
 ```
 
 **实现提示**：
@@ -1054,7 +1064,7 @@ open class Animal {
         this.name = name
     }
 
-    func speak(): String {
+    public open func speak(): String {
         return "..."
     }
 }
@@ -1064,7 +1074,7 @@ class Dog <: Animal {
         super(name)
     }
 
-    func speak(): String {
+    public override func speak(): String {
         return "Woof"
     }
 }
@@ -1151,7 +1161,7 @@ class User <: Printable {
         this.name = name
     }
 
-    func display(): String {
+    public func display(): String {
         return this.name
     }
 }
