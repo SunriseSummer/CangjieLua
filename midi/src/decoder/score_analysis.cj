@@ -1,68 +1,16 @@
 package midi.decoder
 
 import std.collection.*
+
 // ============================================================
-// MIDI 乐谱分析：事件解码、音符配对、和弦检测、轨道分析
+// MIDI 乐谱分析 — 事件解码、音符配对、和弦检测、轨道元数据提取
+// 数据类型定义见 score_types.cj
 // ============================================================
-
-// ── 内部事件表示 ──
-
-class DecodedEvent {
-    var absTick: UInt32
-    var eventType: UInt8
-    var channel: UInt8
-    var data1: UInt8
-    var data2: UInt8
-    var metaType: UInt8
-    var metaData: Array<UInt8>
-
-    init(absTick: UInt32, eventType: UInt8, channel: UInt8,
-         data1: UInt8, data2: UInt8) {
-        this.absTick = absTick
-        this.eventType = eventType
-        this.channel = channel
-        this.data1 = data1
-        this.data2 = data2
-        this.metaType = 0
-        this.metaData = Array<UInt8>()
-    }
-
-    init(absTick: UInt32, metaType: UInt8, metaData: Array<UInt8>) {
-        this.absTick = absTick
-        this.eventType = 0xFF
-        this.channel = 0
-        this.data1 = 0
-        this.data2 = 0
-        this.metaType = metaType
-        this.metaData = metaData
-    }
-}
-
-class PairedNote {
-    var pitch: UInt8
-    var velocity: UInt8
-    var channel: UInt8
-    var startTick: UInt32
-    var durationTicks: UInt32
-
-    init(pitch: UInt8, velocity: UInt8, channel: UInt8,
-         startTick: UInt32, durationTicks: UInt32) {
-        this.pitch = pitch
-        this.velocity = velocity
-        this.channel = channel
-        this.startTick = startTick
-        this.durationTicks = durationTicks
-    }
-}
-
-enum ScoreLine {
-    | NoteLine(PairedNote)
-    | RestLine(UInt32)
-    | ChordLine(ArrayList<PairedNote>)
-}
 
 // ── 轨道事件解码 ──
 
+// 将 MIDI 二进制轨道数据解码为 DecodedEvent 列表
+// 处理 Meta 事件、SysEx 事件和通道事件（含 Running Status）
 func decodeTrackEvents(data: Array<UInt8>, trackStart: Int64, trackEnd: Int64): ArrayList<DecodedEvent> {
     let events = ArrayList<DecodedEvent>()
     var j = trackStart
@@ -141,6 +89,8 @@ func decodeTrackEvents(data: Array<UInt8>, trackStart: Int64, trackEnd: Int64): 
 
 // ── 音符配对 ──
 
+// 将 NoteOn/NoteOff 事件配对，生成带有起始位置和持续时长的 PairedNote 列表
+// 使用 pending 哈希表按 (channel, pitch) 跟踪未关闭的 NoteOn 事件
 func pairNotes(events: ArrayList<DecodedEvent>): ArrayList<PairedNote> {
     let notes = ArrayList<PairedNote>()
     let pending = HashMap<Int64, ArrayList<(UInt32, UInt8)>>()
@@ -170,7 +120,7 @@ func pairNotes(events: ArrayList<DecodedEvent>): ArrayList<PairedNote> {
         }
     }
 
-    // Sort by startTick
+    // 按起始 tick 位置排序（插入排序）
     var si: Int64 = 1
     while (si < notes.size) {
         let key = notes[si]
@@ -186,11 +136,11 @@ func pairNotes(events: ArrayList<DecodedEvent>): ArrayList<PairedNote> {
     notes
 }
 
-// ── IOI-based duration assignment ──
+// ── 基于 IOI（音符间隔）的时值修正 ──
 
-// Replace raw note-off durations with inter-onset intervals.
-// For sequential notes, the duration becomes the gap from this note's start
-// to the next note's start, naturally absorbing small articulation gaps.
+// 将原始 NoteOff 时值替换为音符间隔（Inter-Onset Interval）
+// 对于顺序演奏的音符，时值变为当前音符到下一个音符的时间间隔
+// 这样可以自然地吸收小的断奏间隙，使记谱更符合乐谱习惯
 func applyIOIDurations(notes: ArrayList<PairedNote>): Unit {
     if (notes.size <= 1) { return }
     var i: Int64 = 0
@@ -200,8 +150,8 @@ func applyIOIDurations(notes: ArrayList<PairedNote>): Unit {
         if (next.startTick > curr.startTick) {
             let ioi = next.startTick - curr.startTick
             let origEnd = curr.startTick + curr.durationTicks
-            // Use IOI when: the next note starts before or near this note's end,
-            // i.e. notes overlap or the gap is small relative to the note duration.
+            // 当下一个音符在当前音符结束前或附近开始时使用 IOI
+            // 即音符重叠或间隙相对于音符时值较小时
             let gap = if (next.startTick > origEnd) { next.startTick - origEnd } else { UInt32(0) }
             if (gap < curr.durationTicks / 2) {
                 curr.durationTicks = ioi
@@ -212,6 +162,10 @@ func applyIOIDurations(notes: ArrayList<PairedNote>): Unit {
 }
 
 // ── 和弦检测与休止符插入 ──
+
+// 将配对音符列表组织为乐谱行：单音符、和弦或休止符
+// 同一 tick 位置开始且时值相同的多个音符被识别为和弦
+// 间隔超过阈值（TPQ/8）的空白被插入为休止符
 
 func groupNotesIntoChords(notes: ArrayList<PairedNote>, tpq: Int64): ArrayList<ScoreLine> {
     let lines = ArrayList<ScoreLine>()
@@ -231,7 +185,7 @@ func groupNotesIntoChords(notes: ArrayList<PairedNote>, tpq: Int64): ArrayList<S
             currentTick = note.startTick
         }
 
-        // Find simultaneous notes
+        // 查找同一 tick 位置的所有音符
         var j = i + 1
         while (j < notes.size && notes[j].startTick == note.startTick) {
             j++
@@ -242,7 +196,7 @@ func groupNotesIntoChords(notes: ArrayList<PairedNote>, tpq: Int64): ArrayList<S
             lines.add(ScoreLine.NoteLine(note))
             currentTick = note.startTick + note.durationTicks
         } else {
-            // Check if all notes have same duration (chord)
+            // 检查所有音符是否具有相同时值（即为和弦）
             var allSameDuration = true
             var ki = i + 1
             while (ki < j) {
@@ -283,6 +237,9 @@ func groupNotesIntoChords(notes: ArrayList<PairedNote>, tpq: Int64): ArrayList<S
 
 // ── 轨道元数据提取 ──
 
+// 从事件列表中提取轨道名称（Meta 事件类型 0x03）
+// 将空格和制表符替换为下划线，使其适合作为标识符使用
+
 func extractTrackName(events: ArrayList<DecodedEvent>): String {
     for (ev in events) {
         if (ev.eventType == 0xFF && ev.metaType == 0x03 && ev.metaData.size > 0) {
@@ -302,6 +259,8 @@ func extractTrackName(events: ArrayList<DecodedEvent>): String {
     ""
 }
 
+// 从事件列表中提取音色编号（Program Change 事件，类型 0xC0）
+// 返回第一个 Program Change 的音色号，未找到返回 -1
 func extractProgram(events: ArrayList<DecodedEvent>): Int64 {
     for (ev in events) {
         if (ev.eventType == 0xC0) {
@@ -311,6 +270,8 @@ func extractProgram(events: ArrayList<DecodedEvent>): Int64 {
     -1
 }
 
+// 从事件列表中提取 MIDI 通道号
+// 扫描 NoteOn/NoteOff/ProgramChange/CC 事件，返回第一个找到的通道号
 func extractChannel(events: ArrayList<DecodedEvent>): Int64 {
     for (ev in events) {
         let evType = ev.eventType
@@ -321,7 +282,8 @@ func extractChannel(events: ArrayList<DecodedEvent>): Int64 {
     -1
 }
 
-// Find the most common velocity across all Note On events
+// 提取所有 NoteOn 事件中出现频率最高的力度值
+// 用于确定轨道的默认力度设置
 func extractVelocity(events: ArrayList<DecodedEvent>): Int64 {
     let velCounts = HashMap<Int64, Int64>()
     for (ev in events) {
@@ -342,6 +304,8 @@ func extractVelocity(events: ArrayList<DecodedEvent>): Int64 {
     mainVel
 }
 
+// 从事件列表中提取所有速度变化事件（Meta 类型 0x51）
+// 返回 (绝对tick位置, BPM) 元组列表
 func extractTempoEvents(events: ArrayList<DecodedEvent>): ArrayList<(UInt32, Int64)> {
     let tempos = ArrayList<(UInt32, Int64)>()
     for (ev in events) {
@@ -354,6 +318,8 @@ func extractTempoEvents(events: ArrayList<DecodedEvent>): ArrayList<(UInt32, Int
     tempos
 }
 
+// 从事件列表中提取所有控制器事件（CC 和 PitchBend）
+// 返回 (绝对tick位置, 事件) 元组列表
 func extractControlEvents(events: ArrayList<DecodedEvent>): ArrayList<(UInt32, DecodedEvent)> {
     let controls = ArrayList<(UInt32, DecodedEvent)>()
     for (ev in events) {
