@@ -55,13 +55,15 @@ func basePitch(noteRune: Rune): Int64 {
     return -1
 }
 
+let RAW_TICK_OFFSET: Int64 = 10000   // readNumber 中用于标记原始 tick 值的偏移量
+
 // 时值 → ticks（480 ticks / 四分音符）
-// 支持标准时值、附点时值（负值）、原始 tick 值（> 10000 偏移）
+// 支持标准时值、附点时值（负值）、原始 tick 值（> RAW_TICK_OFFSET 偏移）
 func durationToTicks(duration: Int64): UInt32 {
     if (duration == 0) { return 480 }
-    // 原始 tick 值（readNumber 添加了 10000 偏移）
-    if (duration > 10000) {
-        return UInt32(duration - 10000)
+    // 原始 tick 值（readNumber 添加了 RAW_TICK_OFFSET 偏移）
+    if (duration > RAW_TICK_OFFSET) {
+        return UInt32(duration - RAW_TICK_OFFSET)
     }
     if (duration < 0) {
         // 附点音符：基础时值 × 1.5
@@ -106,8 +108,8 @@ func readNumber(runes: Array<Rune>, startPos: Int64, size: Int64): NumberResult 
             found = true
         }
         if (!found) { return NumberResult(4, i) }
-        // 用特殊范围标记原始 tick 值：值 > 1000 视为原始 tick
-        return NumberResult(num + 10000, i)
+        // 用 RAW_TICK_OFFSET 标记原始 tick 值
+        return NumberResult(num + RAW_TICK_OFFSET, i)
     }
 
     var num: Int64 = 0

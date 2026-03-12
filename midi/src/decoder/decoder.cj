@@ -166,17 +166,7 @@ public func decompile(data: Array<UInt8>): String {
     }
 
     // 按 tick 排序速度变化
-    var si: Int64 = 1
-    while (si < allTempoChanges.size) {
-        let key = allTempoChanges[si]
-        var sj = si - 1
-        while (sj >= 0 && allTempoChanges[sj].tick > key.tick) {
-            allTempoChanges[sj + 1] = allTempoChanges[sj]
-            sj--
-        }
-        allTempoChanges[sj + 1] = key
-        si++
-    }
+    sortTempoChanges(allTempoChanges)
 
     // 确定初始速度
     let firstTempoBPM: Int64 = if (allTempoChanges.size > 0) {

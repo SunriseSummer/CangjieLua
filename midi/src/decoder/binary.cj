@@ -95,3 +95,18 @@ class DecodedTrack {
         this.channel = -1
     }
 }
+
+// 按 tick 位置排序速度变化（插入排序）
+func sortTempoChanges(changes: ArrayList<DecodedTempoChange>): Unit {
+    var i: Int64 = 1
+    while (i < changes.size) {
+        let key = changes[i]
+        var j = i - 1
+        while (j >= 0 && changes[j].tick > key.tick) {
+            changes[j + 1] = changes[j]
+            j--
+        }
+        changes[j + 1] = key
+        i++
+    }
+}

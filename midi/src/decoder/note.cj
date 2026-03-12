@@ -70,7 +70,7 @@ func quantizeDuration(ticks: UInt32, tpq: UInt16): String {
 
     if (errorPct > 5) {
         // 误差过大，输出原始 tick 值（缩放到 TPQ=480）
-        let scaled = Int64(scaleTicks(ticks, tpq))
+        let scaled = scaleTicks(ticks, tpq)
         "T${scaled}"
     } else if (bestDur < 0) {
         "${-bestDur}."
