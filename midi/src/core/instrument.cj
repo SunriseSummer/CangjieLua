@@ -181,11 +181,13 @@ func buildInstrumentMap(): HashMap<String, Int64> {
     m
 }
 
+// 全局乐器名映射表（模块加载时构建一次）
+let GM_INSTRUMENT_MAP: HashMap<String, Int64> = buildInstrumentMap()
+
 // 乐器名 → GM 编号（HashMap 查表，未知名称返回 0 即 piano）
 public func instrumentNumber(name: String): Int64 {
-    let m = buildInstrumentMap()
     let lower = name.toAsciiLower()
-    if (let Some(v) <- m.get(lower)) {
+    if (let Some(v) <- GM_INSTRUMENT_MAP.get(lower)) {
         v
     } else {
         0
