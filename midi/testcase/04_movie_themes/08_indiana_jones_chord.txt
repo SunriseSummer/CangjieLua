@@ -1,0 +1,9 @@
+// 夺宝奇兵 — 和弦
+TEMPO 120
+INSTRUMENT trumpet
+E4 16  F4 16  G4 16  C5 16  D5 8  E5 8  F5 8  G5 8
+[C3 E3 G3 C4] 4  R 8
+E4 8  F4 8  G4 8
+[F3 A3 C4 F4] 4  R 8
+G4 8  A4 8  B4 8
+[G3 B3 D4 G4] 4

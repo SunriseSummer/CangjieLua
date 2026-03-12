@@ -1,0 +1,9 @@
+// 钟声颂歌 — 和弦
+TEMPO 144
+INSTRUMENT piano
+A4 16  G#4 16  A4 16  F#4 16  A4 16  G#4 16  A4 16  F#4 16
+[D3 A3 D4 F#4] 4  R 8
+A4 8  B4 8  C5 8
+[A3 C4 E4 A4] 4  R 8
+G#4 8  A4 8  B4 8
+[E3 B3 E4 G#4] 4

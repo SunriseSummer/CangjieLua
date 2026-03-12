@@ -1,0 +1,7 @@
+// 迈克尔杰克逊 Billie Jean — 乐器选择
+TEMPO 116
+INSTRUMENT guitar
+F#4 4  A4 4  E4 4  F#4 4
+A4 4  B4 4  A4 4  F#4 4
+E4 4  F#4 4  A4 4  B4 4
+C#5 4  B4 4  A4 2

@@ -1,0 +1,38 @@
+// 小蜘蛛 — 三轨完整编曲
+TEMPO 120
+
+// 主旋律
+TRACK melody
+INSTRUMENT piano
+G4 4  C5 4  C5 4  C5 4
+D5 4  E5 4  E5 2
+E5 4  D5 4  C5 4  D5 4
+E5 4  C5 4  C5 2
+E5 4  E5 4  F5 4  G5 4
+G5 4  F5 4  E5 4  F5 4
+E5 8  D5 8  C5 8  D5 8  C5 4  D5 4
+E5 4  C5 4  C5 2
+
+// 弦乐和弦
+TRACK harmony
+INSTRUMENT strings
+[C3 E3 G3] 2  [C3 E3 G3] 2
+[F3 A3 C4] 2  [C3 E3 G3] 2
+[C3 E3 G3] 2  [G3 B3 D4] 2
+[C3 E3 G3] 2  [G3 B3 D4] 2
+[C3 E3 G3] 2  [F3 A3 C4] 2
+[C3 E3 G3] 2  [F3 A3 C4] 2
+[C3 E3 G3] 2  [G3 B3 D4] 2
+[C3 E3 G3] 2  [G3 B3 D4] 2
+
+// 贝斯低音
+TRACK bass
+INSTRUMENT bass
+C2 2  E2 2
+F2 2  C2 2
+C2 2  G2 2
+C2 2  G2 2
+C2 2  F2 2
+C2 2  F2 2
+C2 2  G2 2
+C2 2  G2 2

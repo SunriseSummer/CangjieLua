@@ -1,0 +1,20 @@
+// 红鼻子驯鹿鲁道夫 — 多轨道
+TEMPO 120
+
+TRACK melody
+INSTRUMENT piano
+G4 4  A4 4  G4 4  E4 4
+C5 4  A4 4  G4 2
+G4 4  A4 4  G4 4  A4 4
+G4 4  C5 4  B4 2
+F4 4  G4 4  F4 4  D4 4
+B4 4  A4 4  G4 2
+G4 4  A4 4  G4 4  A4 4
+G4 4  A4 4  E5 2
+
+TRACK bass
+INSTRUMENT bass
+C3 2  E3 2
+F3 2  C3 2
+G2 2  C3 2
+F3 2  G3 2

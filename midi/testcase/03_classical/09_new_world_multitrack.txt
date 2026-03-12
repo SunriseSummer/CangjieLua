@@ -1,0 +1,20 @@
+// 德沃夏克 新世界交响曲 — 多轨道
+TEMPO 52
+
+TRACK melody
+INSTRUMENT flute
+E4 2  G4 4  G4 2
+E4 4  D4 4  C4 4  D4 4
+E4 2  G4 4  E4 2
+D4 4  C4 2  D4 4
+E4 2  D4 4  C4 4
+D4 4  E4 4  G4 2
+E4 4  D4 4  C4 4  D4 4
+E4 2  C4 2
+
+TRACK bass
+INSTRUMENT bass
+C3 2  E3 2
+F3 2  C3 2
+C3 2  E3 2
+G2 2  C3 2

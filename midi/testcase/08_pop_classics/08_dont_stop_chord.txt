@@ -1,0 +1,9 @@
+// 旅行者乐队 Don't Stop Believin — 和弦
+TEMPO 120
+INSTRUMENT piano
+E4 16  G4 16  B4 16  E5 16  D5 16  B4 16  G4 16  E4 16
+[E3 B3 E4 G4] 4  R 8
+E4 8  G4 8  B4 8
+[A3 C4 E4 A4] 4  R 8
+C4 8  E4 8  A4 8
+[B3 D4 F#4 B4] 4
