@@ -5,7 +5,7 @@ import std.convert.*
 import midi.core.*
 
 // ============================================================
-// MIDI 编码器：ScoreData → MIDI 二进制 / MIDI_RAW 文本 → MIDI 二进制
+// MIDI 编码器：ScoreData → MIDI 二进制 / MIDI 可读文本 → MIDI 二进制
 // ============================================================
 
 let TICKS_PER_QUARTER: UInt16 = 480   // 每四分音符 tick 数
@@ -31,11 +31,55 @@ func parseHexByte(s: String): UInt8 {
     UInt8(hi * 16 + lo)
 }
 
-// ── MIDI_RAW 格式编码器 ──
+// ── 音名解析工具 ──
 
-// 判断输入是否为 MIDI_RAW 格式
+// 音名基础值: C=0, D=2, E=4, F=5, G=7, A=9, B=11
+func encBasePitch(noteRune: Rune): Int64 {
+    if (noteRune == r'C') { return 0 }
+    if (noteRune == r'D') { return 2 }
+    if (noteRune == r'E') { return 4 }
+    if (noteRune == r'F') { return 5 }
+    if (noteRune == r'G') { return 7 }
+    if (noteRune == r'A') { return 9 }
+    if (noteRune == r'B') { return 11 }
+    return -1
+}
+
+// 音名字符串 → MIDI 音高 (如 "C4" → 60, "C#4" → 61, "Db4" → 61)
+func noteNameToMidi(name: String): Int64 {
+    let runes = name.toRuneArray()
+    if (runes.size < 2) { return -1 }
+    let base = encBasePitch(runes[0])
+    if (base < 0) { return -1 }
+    var i: Int64 = 1
+    var accidental: Int64 = 0
+    if (i < runes.size && runes[i] == r'#') { accidental = 1; i++ }
+    else if (i < runes.size && runes[i] == r'b') { accidental = -1; i++ }
+    // 读取八度数字（可能为负数如 C-1）
+    var neg = false
+    if (i < runes.size && runes[i] == r'-') { neg = true; i++ }
+    if (i >= runes.size) { return -1 }
+    var octave: Int64 = 0
+    while (i < runes.size && runes[i] >= r'0' && runes[i] <= r'9') {
+        octave = octave * 10 + (runes[i].position() - r'0'.position())
+        i++
+    }
+    if (neg) { octave = -octave }
+    (octave + 1) * 12 + base + accidental
+}
+
+// ── 格式检测 ──
+
+// 判断输入是否为 MIDI_RAW 格式（旧格式，向后兼容）
 func isMidiRawFormat(input: String): Bool {
     input.trimAscii().startsWith("MIDI_RAW")
+}
+
+// 判断输入是否为 MIDI 可读格式（新格式）
+func isMidiReadableFormat(input: String): Bool {
+    let trimmed = input.trimAscii()
+    // "MIDI\n" 但不是 "MIDI_RAW"
+    trimmed.startsWith("MIDI") && !trimmed.startsWith("MIDI_RAW")
 }
 
 // 按空白分割字符串
@@ -58,6 +102,8 @@ func splitByWhitespace(s: String): ArrayList<String> {
     if (inWord) { result.add(current.toString()) }
     result
 }
+
+// ── MIDI_RAW 格式编码器（向后兼容） ──
 
 // 解析 MIDI_RAW 格式文本 → MIDI 二进制
 func generateRaw(input: String): Array<UInt8> {
@@ -146,6 +192,304 @@ func generateRaw(input: String): Array<UInt8> {
     result.toArray()
 }
 
+// ── MIDI 可读格式编码器 ──
+
+// 查找 "CH" 关键字后的通道号
+func findChannel(parts: ArrayList<String>): UInt8 {
+    var i: Int64 = 0
+    while (i < parts.size - 1) {
+        if (parts[i] == "CH") {
+            try { return UInt8.parse(parts[i + 1]) } catch (_: Exception) {}
+        }
+        i++
+    }
+    return 0
+}
+
+// 编码单个可读事件行到轨道字节流（带 Running Status 支持）
+func encodeReadableEvent(td: ArrayList<UInt8>, parts: ArrayList<String>,
+                         delta: UInt32, useRS: Bool,
+                         lastStatus: UInt8): UInt8 {
+    // 写入 VLQ delta time
+    let vlqBytes = encodeVLQ(delta)
+    for (b in vlqBytes) { td.add(b) }
+
+    let eventType = parts[1]
+    var newLastStatus = lastStatus
+
+    if (eventType == "ON") {
+        // ON <note_name> <velocity> CH <channel>
+        if (parts.size < 4) { return lastStatus }
+        let pitch = noteNameToMidi(parts[2])
+        if (pitch < 0) { return lastStatus }
+        var vel: UInt8 = 0
+        try { vel = UInt8.parse(parts[3]) } catch (_: Exception) {}
+        let ch = findChannel(parts)
+        let status: UInt8 = 0x90 | ch
+        if (useRS && status == lastStatus) {
+            // Running Status: 省略 status 字节
+        } else {
+            td.add(status)
+        }
+        td.add(UInt8(pitch))
+        td.add(vel)
+        newLastStatus = status
+
+    } else if (eventType == "OFF") {
+        // OFF <note_name> <velocity> CH <channel>
+        if (parts.size < 4) { return lastStatus }
+        let pitch = noteNameToMidi(parts[2])
+        if (pitch < 0) { return lastStatus }
+        var vel: UInt8 = 0
+        try { vel = UInt8.parse(parts[3]) } catch (_: Exception) {}
+        let ch = findChannel(parts)
+        let status: UInt8 = 0x80 | ch
+        if (useRS && status == lastStatus) {
+            // Running Status
+        } else {
+            td.add(status)
+        }
+        td.add(UInt8(pitch))
+        td.add(vel)
+        newLastStatus = status
+
+    } else if (eventType == "PROGRAM") {
+        // PROGRAM <number> CH <channel>
+        if (parts.size < 3) { return lastStatus }
+        var prog: UInt8 = 0
+        try { prog = UInt8.parse(parts[2]) } catch (_: Exception) {}
+        let ch = findChannel(parts)
+        let status: UInt8 = 0xC0 | ch
+        if (useRS && status == lastStatus) {
+            // Running Status
+        } else {
+            td.add(status)
+        }
+        td.add(prog)
+        newLastStatus = status
+
+    } else if (eventType == "CC") {
+        // CC <ctrl> <val> CH <channel>
+        if (parts.size < 4) { return lastStatus }
+        var ctrl: UInt8 = 0
+        var val2: UInt8 = 0
+        try { ctrl = UInt8.parse(parts[2]) } catch (_: Exception) {}
+        try { val2 = UInt8.parse(parts[3]) } catch (_: Exception) {}
+        let ch = findChannel(parts)
+        let status: UInt8 = 0xB0 | ch
+        if (useRS && status == lastStatus) {
+            // Running Status
+        } else {
+            td.add(status)
+        }
+        td.add(ctrl)
+        td.add(val2)
+        newLastStatus = status
+
+    } else if (eventType == "CHAN_PRESSURE") {
+        // CHAN_PRESSURE <value> CH <channel>
+        if (parts.size < 3) { return lastStatus }
+        var pressure: UInt8 = 0
+        try { pressure = UInt8.parse(parts[2]) } catch (_: Exception) {}
+        let ch = findChannel(parts)
+        let status: UInt8 = 0xD0 | ch
+        if (useRS && status == lastStatus) {
+            // Running Status
+        } else {
+            td.add(status)
+        }
+        td.add(pressure)
+        newLastStatus = status
+
+    } else if (eventType == "AFTERTOUCH") {
+        // AFTERTOUCH <note_name> <pressure> CH <channel>
+        if (parts.size < 4) { return lastStatus }
+        let pitch = noteNameToMidi(parts[2])
+        if (pitch < 0) { return lastStatus }
+        var pressure: UInt8 = 0
+        try { pressure = UInt8.parse(parts[3]) } catch (_: Exception) {}
+        let ch = findChannel(parts)
+        let status: UInt8 = 0xA0 | ch
+        if (useRS && status == lastStatus) {
+            // Running Status
+        } else {
+            td.add(status)
+        }
+        td.add(UInt8(pitch))
+        td.add(pressure)
+        newLastStatus = status
+
+    } else if (eventType == "PITCH_BEND") {
+        // PITCH_BEND <lsb> <msb> CH <channel>
+        if (parts.size < 4) { return lastStatus }
+        var lsb: UInt8 = 0
+        var msb: UInt8 = 0
+        try { lsb = UInt8.parse(parts[2]) } catch (_: Exception) {}
+        try { msb = UInt8.parse(parts[3]) } catch (_: Exception) {}
+        let ch = findChannel(parts)
+        let status: UInt8 = 0xE0 | ch
+        if (useRS && status == lastStatus) {
+            // Running Status
+        } else {
+            td.add(status)
+        }
+        td.add(lsb)
+        td.add(msb)
+        newLastStatus = status
+
+    } else if (eventType == "SET_TEMPO") {
+        // SET_TEMPO <microseconds>
+        if (parts.size < 3) { return lastStatus }
+        var micro: UInt32 = 500000
+        try { micro = UInt32.parse(parts[2]) } catch (_: Exception) {}
+        td.add(0xFF); td.add(0x51); td.add(0x03)
+        td.add(UInt8((micro >> 16) & 0xFF))
+        td.add(UInt8((micro >> 8) & 0xFF))
+        td.add(UInt8(micro & 0xFF))
+        newLastStatus = 0  // Meta 事件重置 Running Status
+
+    } else if (eventType == "END_TRACK") {
+        // END_TRACK
+        td.add(0xFF); td.add(0x2F); td.add(0x00)
+        newLastStatus = 0
+
+    } else if (eventType == "META") {
+        // META <type_hex> <data_hex...>
+        if (parts.size < 3) { return lastStatus }
+        let metaType = parseHexByte(parts[2])
+        let dataLen = parts.size - 3
+        td.add(0xFF)
+        td.add(metaType)
+        // VLQ 编码 data 长度
+        let lenVLQ = encodeVLQ(UInt32(dataLen))
+        for (b in lenVLQ) { td.add(b) }
+        // 数据字节
+        var di: Int64 = 3
+        while (di < parts.size) {
+            td.add(parseHexByte(parts[di]))
+            di++
+        }
+        newLastStatus = 0
+
+    } else if (eventType == "SYSEX") {
+        // SYSEX <status_hex> <data_hex...>
+        if (parts.size < 3) { return lastStatus }
+        td.add(parseHexByte(parts[2]))  // F0 or F7
+        let dataLen = parts.size - 3
+        let lenVLQ = encodeVLQ(UInt32(dataLen))
+        for (b in lenVLQ) { td.add(b) }
+        var si: Int64 = 3
+        while (si < parts.size) {
+            td.add(parseHexByte(parts[si]))
+            si++
+        }
+        newLastStatus = 0
+
+    } else if (eventType == "CH_EVENT") {
+        // CH_EVENT <status_hex> <data_hex...>
+        if (parts.size < 3) { return lastStatus }
+        var pi: Int64 = 2
+        while (pi < parts.size) {
+            if (parts[pi] == "CH") { break }
+            td.add(parseHexByte(parts[pi]))
+            pi++
+        }
+        newLastStatus = 0
+    }
+
+    newLastStatus
+}
+
+// 解析 MIDI 可读格式文本 → MIDI 二进制
+func generateReadable(input: String): Array<UInt8> {
+    var tpq: UInt16 = 480
+    var format: UInt16 = 0
+    var useRS = false
+    let trackDataList = ArrayList<ArrayList<UInt8>>()
+    var currentTrack: ?ArrayList<UInt8> = None
+    var inTrack = false
+    var lastStatus: UInt8 = 0
+
+    for (line in input.split("\n")) {
+        let trimmed = line.trimAscii()
+        if (trimmed.isEmpty() || trimmed.startsWith("//")) { continue }
+
+        if (trimmed == "MIDI") { continue }
+
+        if (trimmed.startsWith("TPQ ")) {
+            let parts = splitByWhitespace(trimmed)
+            if (parts.size >= 2) {
+                try { tpq = UInt16.parse(parts[1]) } catch (_: Exception) {}
+            }
+            continue
+        }
+
+        if (trimmed.startsWith("FORMAT ")) {
+            let parts = splitByWhitespace(trimmed)
+            if (parts.size >= 2) {
+                try { format = UInt16.parse(parts[1]) } catch (_: Exception) {}
+            }
+            continue
+        }
+
+        if (trimmed == "RUNNING_STATUS ON") {
+            useRS = true
+            continue
+        }
+        if (trimmed == "RUNNING_STATUS OFF") {
+            useRS = false
+            continue
+        }
+
+        if (trimmed == "TRACK") {
+            currentTrack = ArrayList<UInt8>()
+            inTrack = true
+            lastStatus = 0
+            continue
+        }
+
+        if (trimmed == "TRACK_END") {
+            if (let Some(td) <- currentTrack) {
+                trackDataList.add(td)
+            }
+            currentTrack = None
+            inTrack = false
+            lastStatus = 0
+            continue
+        }
+
+        // 轨道内的事件行: <delta> <event_type> <params...>
+        if (inTrack) {
+            if (let Some(td) <- currentTrack) {
+                let parts = splitByWhitespace(trimmed)
+                if (parts.size < 2) { continue }
+                // 解析 delta time
+                var delta: UInt32 = 0
+                try { delta = UInt32.parse(parts[0]) } catch (_: Exception) { continue }
+                lastStatus = encodeReadableEvent(td, parts, delta, useRS, lastStatus)
+            }
+        }
+    }
+
+    let trackCount = trackDataList.size
+
+    // 组装 MThd + MTrk 块
+    let result = ArrayList<UInt8>()
+    result.add(0x4D); result.add(0x54); result.add(0x68); result.add(0x64)
+    writeUInt32BE(result, 6)
+    writeUInt16BE(result, format)
+    writeUInt16BE(result, UInt16(trackCount))
+    writeUInt16BE(result, tpq)
+
+    for (td in trackDataList) {
+        result.add(0x4D); result.add(0x54); result.add(0x72); result.add(0x6B)
+        writeUInt32BE(result, UInt32(td.size))
+        for (b in td) { result.add(b) }
+    }
+
+    result.toArray()
+}
+
 // ── 乐谱格式编码器（原有功能） ──
 
 // 将一条轨道的音乐元素转换为 MIDI 事件序列
@@ -225,11 +569,19 @@ func encodeTrackChunk(events: ArrayList<TimedEvent>): ArrayList<UInt8> {
 }
 
 // 核心入口：文本乐谱 → MIDI 文件字节数组
-// 自动检测 MIDI_RAW 格式（无损原始事件）和乐谱格式（人类可读记谱法）
+// 自动检测三种输入格式：
+//   1. MIDI 可读事件格式（无损，以 "MIDI" 开头，含人类可读事件名和音名）
+//   2. MIDI_RAW 格式（旧版无损格式，以 "MIDI_RAW" 开头，向后兼容）
+//   3. 乐谱记谱格式（人类友好的音乐记谱法）
 public func generate(input: String): Array<UInt8> {
-    // 检测 MIDI_RAW 格式
+    // 检测 MIDI_RAW 格式（需先于 MIDI 可读格式检测，因 MIDI_RAW 也以 MIDI 开头）
     if (isMidiRawFormat(input)) {
         return generateRaw(input)
+    }
+
+    // 检测 MIDI 可读事件格式
+    if (isMidiReadableFormat(input)) {
+        return generateReadable(input)
     }
 
     let score = parseScore(input)

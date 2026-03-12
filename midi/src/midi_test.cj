@@ -108,9 +108,10 @@ class MidiTests {
         let midi1 = generate(input)
         @Assert(verifyMThd(midi1, 1, 3))
 
-        // 反编译应输出 MIDI_RAW 格式
+        // 反编译应输出 MIDI 可读事件格式
         let decompiled = decompile(midi1)
-        @Assert(decompiled.startsWith("MIDI_RAW"))
+        @Assert(decompiled.startsWith("MIDI"))
+        @Assert(!decompiled.startsWith("MIDI_RAW"))
 
         // 重新编码应产生二进制完全一致的输出
         let midi2 = generate(decompiled)
@@ -327,8 +328,8 @@ class MidiTests {
 
         let data = File.readFrom(midPath)
         let text = decompile(data)
-        // MIDI_RAW 格式应包含 SetTempo 的原始字节
-        @Assert(text.startsWith("MIDI_RAW"))
+        @Assert(text.startsWith("MIDI"))
+        @Assert(!text.startsWith("MIDI_RAW"))
         // 反编译后重新编码应二进制一致
         let regen = generate(text)
         verifyBinaryIdentical(data, regen)
@@ -363,7 +364,8 @@ class MidiTests {
         @Assert(data[3], 0x64)  // 'd'
 
         let text = decompile(data)
-        @Assert(text.startsWith("MIDI_RAW"))
+        @Assert(text.startsWith("MIDI"))
+        @Assert(!text.startsWith("MIDI_RAW"))
 
         // 重新编码应产生二进制完全一致的输出
         let regen = generate(text)
