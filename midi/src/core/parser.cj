@@ -56,8 +56,18 @@ func basePitch(noteRune: Rune): Int64 {
 }
 
 // 时值 → ticks（480 ticks / 四分音符）
+// 支持标准时值、附点时值（负值）、原始 tick 值（> 10000 偏移）
 func durationToTicks(duration: Int64): UInt32 {
-    if (duration <= 0) { return 480 }
+    if (duration == 0) { return 480 }
+    // 原始 tick 值（readNumber 添加了 10000 偏移）
+    if (duration > 10000) {
+        return UInt32(duration - 10000)
+    }
+    if (duration < 0) {
+        // 附点音符：基础时值 × 1.5
+        let base = UInt32(480 * 4 / (-duration))
+        return base * 3 / 2
+    }
     UInt32(480 * 4 / duration)
 }
 
@@ -80,9 +90,26 @@ func runeToDigit(ch: Rune): Int64 {
 
 // ── 基本解析函数 ──
 
-// 从 runes 的 startPos 位置读取一个整数
+// 从 runes 的 startPos 位置读取一个时值
+// 支持格式：4（标准）、4.（附点，返回 -4）、T216（原始 tick）
 func readNumber(runes: Array<Rune>, startPos: Int64, size: Int64): NumberResult {
     var i = startPos
+
+    // 检测 T 前缀（原始 tick 值），返回值存储为 raw ticks
+    if (i < size && runes[i] == r'T') {
+        i++
+        var num: Int64 = 0
+        var found = false
+        while (i < size && isDigitRune(runes[i])) {
+            num = num * 10 + runeToDigit(runes[i])
+            i++
+            found = true
+        }
+        if (!found) { return NumberResult(4, i) }
+        // 用特殊范围标记原始 tick 值：值 > 1000 视为原始 tick
+        return NumberResult(num + 10000, i)
+    }
+
     var num: Int64 = 0
     var found = false
     while (i < size && isDigitRune(runes[i])) {
@@ -92,6 +119,11 @@ func readNumber(runes: Array<Rune>, startPos: Int64, size: Int64): NumberResult 
     }
     if (!found) {
         return NumberResult(4, i)   // 默认四分音符
+    }
+    // 检测附点记号
+    if (i < size && runes[i] == r'.') {
+        i++
+        return NumberResult(-num, i)  // 负值表示附点
     }
     NumberResult(num, i)
 }
@@ -284,7 +316,26 @@ public func parseScore(input: String): ScoreData {
         if (stripped.isEmpty()) { continue }
 
         if (stripped.startsWith("TEMPO")) {
-            handleTempo(splitWhitespace(stripped), score)
+            let parts = splitWhitespace(stripped)
+            if (parts.size >= 2) {
+                // 在 TRACK 内部时，TEMPO 始终为内联速度变化
+                if (hasExplicitTrack) {
+                    try {
+                        let bpm = Int64.parse(parts[1])
+                        currentTrack.elements.add(MusicElement.TempoChange(bpm))
+                    } catch (_: Exception) {}
+                } else {
+                    handleTempo(parts, score)
+                }
+            }
+            continue
+        }
+
+        if (stripped.startsWith("CHANNEL")) {
+            let parts = splitWhitespace(stripped)
+            if (parts.size >= 2) {
+                try { currentTrack.channel = Int64.parse(parts[1]) } catch (_: Exception) {}
+            }
             continue
         }
 

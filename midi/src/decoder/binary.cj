@@ -47,10 +47,12 @@ class PendingNote {
     var pitch: UInt8
     var startTick: UInt32
     var velocity: UInt8
-    init(pitch: UInt8, startTick: UInt32, velocity: UInt8) {
+    var channel: UInt8
+    init(pitch: UInt8, startTick: UInt32, velocity: UInt8, channel: UInt8) {
         this.pitch = pitch
         this.startTick = startTick
         this.velocity = velocity
+        this.channel = channel
     }
 }
 
@@ -69,15 +71,27 @@ class DecodedNote {
     }
 }
 
+// 解码后的速度变化事件
+class DecodedTempoChange {
+    var tick: UInt32
+    var bpm: Int64
+    init(tick: UInt32, bpm: Int64) {
+        this.tick = tick
+        this.bpm = bpm
+    }
+}
+
 // 解码后的轨道
 class DecodedTrack {
     var instrument: Int64                  // GM 乐器编号，-1 表示未设置
     var notes: ArrayList<DecodedNote>      // 已解码的音符列表
     var avgVelocity: Int64                 // 平均力度
+    var channel: Int64                     // MIDI 通道，-1 表示未设置
 
     init() {
         this.instrument = -1
         this.notes = ArrayList<DecodedNote>()
         this.avgVelocity = 80
+        this.channel = -1
     }
 }

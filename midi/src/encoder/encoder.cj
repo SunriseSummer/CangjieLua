@@ -12,7 +12,7 @@ let DEFAULT_VELOCITY: UInt8 = 80      // 默认音符力度
 
 // 将一条轨道的音乐元素转换为 MIDI 事件序列
 func buildTrackEvents(trackData: TrackData, tempo: Int64,
-                      channel: UInt8): ArrayList<TimedEvent> {
+                       channel: UInt8, isFirstTrack: Bool): ArrayList<TimedEvent> {
     let events = ArrayList<TimedEvent>()
     var pendingDelta: UInt32 = 0
 
@@ -24,7 +24,7 @@ func buildTrackEvents(trackData: TrackData, tempo: Int64,
     }
 
     // 首轨道写入 Set Tempo 事件
-    if (channel == 0) {
+    if (isFirstTrack) {
         events.add(TimedEvent(0, MidiEvent.setTempo(UInt32(60000000 / tempo))))
     }
 
@@ -58,6 +58,11 @@ func buildTrackEvents(trackData: TrackData, tempo: Int64,
 
             case MusicElement.Rest(ticks) =>
                 pendingDelta += ticks
+
+            case MusicElement.TempoChange(bpm) =>
+                // 内联速度变化
+                events.add(TimedEvent(pendingDelta, MidiEvent.setTempo(UInt32(60000000 / bpm))))
+                pendingDelta = 0
         }
     }
 
@@ -90,10 +95,19 @@ public func generate(input: String): Array<UInt8> {
     // 逐轨道编码
     let encodedTracks = ArrayList<ArrayList<UInt8>>()
     var channelIdx: UInt8 = 0
+    var isFirst = true
     for (td in score.tracks) {
-        encodedTracks.add(encodeTrackChunk(buildTrackEvents(td, score.tempo, channelIdx)))
-        channelIdx++
-        if (channelIdx == 9) { channelIdx = 10 }  // 跳过打击乐通道
+        // 确定 MIDI 通道：优先使用显式指定值
+        let ch: UInt8 = if (td.channel >= 0 && td.channel <= 15) {
+            UInt8(td.channel)
+        } else {
+            let assigned = channelIdx
+            channelIdx++
+            if (channelIdx == 9) { channelIdx = 10 }  // 跳过打击乐通道
+            assigned
+        }
+        encodedTracks.add(encodeTrackChunk(buildTrackEvents(td, score.tempo, ch, isFirst)))
+        isFirst = false
     }
 
     // 组装 MThd + MTrk 块

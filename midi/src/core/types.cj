@@ -28,11 +28,12 @@ public class ChordInfo {
     }
 }
 
-// 音乐元素：单音、和弦或休止
+// 音乐元素：单音、和弦、休止或速度变化
 public enum MusicElement {
     | SingleNote(NoteInfo)
     | Chord(ChordInfo)
     | Rest(UInt32)         // 休止时长（tick 数）
+    | TempoChange(Int64)   // 内联速度变化（BPM）
 }
 
 // 轨道数据
@@ -40,12 +41,14 @@ public class TrackData {
     public var name: String                       // 轨道名称
     public var instrument: Int64                  // GM 乐器编号，-1 表示未设置
     public var velocity: Int64                    // 力度 (1-127)，-1 表示使用默认值
+    public var channel: Int64                     // MIDI 通道，-1 表示自动分配
     public var elements: ArrayList<MusicElement>  // 音乐元素序列
 
     public init(name: String) {
         this.name = name
         this.instrument = -1
         this.velocity = -1
+        this.channel = -1
         this.elements = ArrayList<MusicElement>()
     }
 }
