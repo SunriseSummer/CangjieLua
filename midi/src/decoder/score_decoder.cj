@@ -5,117 +5,15 @@ import midi.core.*
 
 // ============================================================
 // MIDI 乐谱格式反编译器：.mid 二进制 → 乐谱记谱格式
-// 改进：IOI 时值、时值舍入、力度分组、休止符吸收、行内排列
+// 时值转换与行内收集器见 score_duration.cj
+// 事件解码与音符配对见 score_analysis.cj
+// 和弦检测与元数据提取见 score_grouping.cj
 // ============================================================
-
-// ── 标准时值表（TPQ=480 基准） ──
-
-let STANDARD_DURATIONS: Array<(Int64, String)> = [
-    (1920, "1"), (960, "2"), (480, "4"), (240, "8"), (120, "16"), (60, "32")
-]
-let DOTTED_DURATIONS: Array<(Int64, String)> = [
-    (2880, "1."), (1440, "2."), (720, "4."), (360, "8."), (180, "16."), (90, "32.")
-]
-
-let VELOCITY_THRESHOLD: Int64 = 15
-
-// ── 时值转换（带 15% 舍入容差） ──
-
-func ticksToScoreDuration(ticks: UInt32, tpq: Int64): String {
-    let scaled: Int64 = Int64(ticks) * 480 / tpq
-
-    // Exact match on standard durations
-    for (pair in STANDARD_DURATIONS) {
-        if (scaled == pair[0]) { return pair[1] }
-    }
-    for (pair in DOTTED_DURATIONS) {
-        if (scaled == pair[0]) { return pair[1] }
-    }
-
-    // Fuzzy match: within 15% of a standard duration
-    var bestName = ""
-    var bestDist: Int64 = Int64.Max
-
-    for (pair in STANDARD_DURATIONS) {
-        let diff = if (scaled > pair[0]) { scaled - pair[0] } else { pair[0] - scaled }
-        let threshold = pair[0] * 15 / 100
-        if (diff <= threshold && diff < bestDist) {
-            bestDist = diff
-            bestName = pair[1]
-        }
-    }
-    for (pair in DOTTED_DURATIONS) {
-        let diff = if (scaled > pair[0]) { scaled - pair[0] } else { pair[0] - scaled }
-        let threshold = pair[0] * 15 / 100
-        if (diff <= threshold && diff < bestDist) {
-            bestDist = diff
-            bestName = pair[1]
-        }
-    }
-
-    if (!bestName.isEmpty()) { return bestName }
-
-    "T${scaled}"
-}
-
-// ── 行内音符收集器 ──
-
-// Collects sequential single notes and flushes them as space-separated lines.
-class InlineCollector {
-    var parts: ArrayList<String> = ArrayList<String>()
-    var count: Int64 = 0
-    var sb: StringBuilder
-
-    init(sb: StringBuilder) {
-        this.sb = sb
-    }
-
-    func flush(): Unit {
-        if (parts.size > 0) {
-            let joined = StringBuilder()
-            var fi: Int64 = 0
-            while (fi < parts.size) {
-                if (fi > 0) { joined.append("  ") }
-                joined.append(parts[fi])
-                fi++
-            }
-            sb.append("${joined}\n")
-            parts.clear()
-            count = 0
-        }
-    }
-
-    func add(text: String): Unit {
-        parts.add(text)
-        count++
-        if (count >= 8) { flush() }
-    }
-}
-
-// Format a single note as "C4 4"
-func formatNote(note: PairedNote, tpq: Int64): String {
-    let dur = ticksToScoreDuration(note.durationTicks, tpq)
-    let name = pitchToName(note.pitch)
-    "${name} ${dur}"
-}
-
-// Format a chord as "[C3 E3 G3] 2"
-func formatChord(chordNotes: ArrayList<PairedNote>, tpq: Int64): String {
-    let dur = ticksToScoreDuration(chordNotes[0].durationTicks, tpq)
-    let csb = StringBuilder()
-    csb.append("[")
-    var first = true
-    for (n in chordNotes) {
-        if (!first) { csb.append(" ") }
-        csb.append(pitchToName(n.pitch))
-        first = false
-    }
-    csb.append("] ${dur}")
-    csb.toString()
-}
 
 // ── 主反编译函数 ──
 
+// 将 MIDI 二进制数据反编译为乐谱记谱格式文本
+// 流程：解码轨道事件 → 提取元数据 → 配对音符 → 分组输出
 public func decompileScore(data: Array<UInt8>): String {
     if (data.size < 14) {
         return "// Error: Invalid MIDI file (too short)\n"
