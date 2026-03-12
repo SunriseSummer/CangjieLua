@@ -7,6 +7,12 @@ import std.fs.*
 // MIDI 反编译器：.mid 二进制 → 文本乐谱
 // ============================================================
 
+let DEC_DEFAULT_VELOCITY: Int64 = 80     // 默认力度 (与 encoder 一致)
+let CHORD_TOLERANCE_DIV: Int64 = 16      // 和弦容差 = TPQ / 此值
+let REST_THRESHOLD_DIV: Int64 = 6        // 休止符阈值 = TPQ / 此值
+let MAX_NOTES_PER_LINE: Int64 = 4        // 每行最多音符/和弦数
+let MAX_INIT_DURATION: UInt32 = 999999   // 和弦最小时值初始值
+
 // 读取大端 UInt16
 func decReadU16(data: Array<UInt8>, pos: Int64): UInt16 {
     UInt16(data[pos]) << 8 | UInt16(data[pos + 1])
@@ -376,7 +382,7 @@ public func decompile(data: Array<UInt8>): String {
         } else { "piano" }
         sb.append("INSTRUMENT ${instrName}\n")
 
-        if (track.avgVelocity != 80) {
+        if (track.avgVelocity != DEC_DEFAULT_VELOCITY) {
             sb.append("VELOCITY ${track.avgVelocity}\n")
         }
 
@@ -385,8 +391,8 @@ public func decompile(data: Array<UInt8>): String {
         var i: Int64 = 0
         var prevEndTick: UInt32 = 0
         var notesOnLine: Int64 = 0
-        let chordTolerance: UInt32 = UInt32(Int64(tpq) / 16)
-        let restThreshold: UInt32 = UInt32(Int64(tpq) / 6)
+        let chordTolerance: UInt32 = UInt32(Int64(tpq) / CHORD_TOLERANCE_DIV)
+        let restThreshold: UInt32 = UInt32(Int64(tpq) / REST_THRESHOLD_DIV)
 
         while (i < notes.size) {
             // 找同时开始的音符组（和弦）
@@ -414,7 +420,7 @@ public func decompile(data: Array<UInt8>): String {
                     }
                     sb.append("R ${restDur}")
                     notesOnLine++
-                    if (notesOnLine >= 4) {
+                    if (notesOnLine >= MAX_NOTES_PER_LINE) {
                         sb.append("\n")
                         notesOnLine = 0
                     }
@@ -439,7 +445,7 @@ public func decompile(data: Array<UInt8>): String {
                     sb.append("  ")
                 }
                 sb.append("[")
-                var minDur: UInt32 = 999999
+                var minDur: UInt32 = MAX_INIT_DURATION
                 var maxEnd: UInt32 = 0
                 var ci = i
                 while (ci < groupEnd) {
@@ -459,7 +465,7 @@ public func decompile(data: Array<UInt8>): String {
                 if (maxEnd > prevEndTick) { prevEndTick = maxEnd }
             }
 
-            if (notesOnLine >= 4) {
+            if (notesOnLine >= MAX_NOTES_PER_LINE) {
                 sb.append("\n")
                 notesOnLine = 0
             }
