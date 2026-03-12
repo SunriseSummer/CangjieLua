@@ -53,13 +53,26 @@ public class TrackData {
     }
 }
 
+// 速度变化条目
+public class TempoEntry {
+    public var tick: UInt32   // 绝对 tick 位置（TPQ=480 基准）
+    public var bpm: Int64     // BPM 速度
+
+    public init(tick: UInt32, bpm: Int64) {
+        this.tick = tick
+        this.bpm = bpm
+    }
+}
+
 // 乐谱数据：包含速度和多轨道信息
 public class ScoreData {
-    public var tempo: Int64                   // BPM 速度
-    public var tracks: ArrayList<TrackData>   // 轨道列表
+    public var tempo: Int64                          // 初始 BPM 速度
+    public var tempoChanges: ArrayList<TempoEntry>   // 速度变化列表（绝对 tick）
+    public var tracks: ArrayList<TrackData>           // 轨道列表
 
     public init() {
         this.tempo = 120
+        this.tempoChanges = ArrayList<TempoEntry>()
         this.tracks = ArrayList<TrackData>()
     }
 }

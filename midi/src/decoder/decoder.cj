@@ -15,51 +15,13 @@ let MAX_INIT_DURATION: UInt32 = 999999 // 和弦最小时值初始值
 
 // ── 轨道文本格式化 ──
 
-// 在指定区间内输出休止符和速度变化（按 tick 位置交错）
-func emitGapWithTempos(sb: StringBuilder, gapStart: UInt32, gapEnd: UInt32,
-                       tempoChanges: ArrayList<DecodedTempoChange>,
-                       tempoIdxRef: ArrayList<Int64>,
-                       tpq: UInt16, notesOnLineRef: ArrayList<Int64>,
-                       restThreshold: UInt32): Unit {
-    var currentPos = gapStart
-    let tidx = tempoIdxRef[0]
-    var ti = tidx
-
-    // 检查区间内是否有速度变化
-    let hasTemposInGap = ti < tempoChanges.size && tempoChanges[ti].tick < gapEnd
-
-    while (ti < tempoChanges.size && tempoChanges[ti].tick <= gapEnd) {
-        let tc = tempoChanges[ti]
-        // 输出当前位置到速度变化位置的休止符
-        // 有速度变化时使用较低阈值，确保定位准确
-        if (tc.tick > currentPos) {
-            let restTicks = tc.tick - currentPos
-            // 速度变化间的间隔始终保留（即使很小），保证正确的时间位置
-            if (notesOnLineRef[0] > 0) { sb.append("  ") }
-            sb.append("R ${quantizeDuration(restTicks, tpq)}")
-            notesOnLineRef[0]++
-            if (notesOnLineRef[0] >= MAX_NOTES_PER_LINE) {
-                sb.append("\n")
-                notesOnLineRef[0] = 0
-            }
-            currentPos = tc.tick
-        }
-        // 输出速度变化
-        if (notesOnLineRef[0] > 0) {
-            sb.append("\n")
-            notesOnLineRef[0] = 0
-        }
-        sb.append("TEMPO ${tc.bpm}\n")
-        ti++
-    }
-    tempoIdxRef[0] = ti
-
-    // 输出剩余的休止符
-    if (gapEnd > currentPos) {
-        let restTicks = gapEnd - currentPos
-        // 有速度变化时使用较低阈值，无速度变化时使用标准阈值
-        let threshold = if (hasTemposInGap) { UInt32(1) } else { restThreshold }
-        if (restTicks >= threshold) {
+// 在指定区间内输出休止符（无速度变化交错，速度变化使用 TEMPO_AT）
+func emitGapRest(sb: StringBuilder, gapStart: UInt32, gapEnd: UInt32,
+                 tpq: UInt16, notesOnLineRef: ArrayList<Int64>,
+                 restThreshold: UInt32): Unit {
+    if (gapEnd > gapStart) {
+        let restTicks = gapEnd - gapStart
+        if (restTicks >= restThreshold) {
             if (notesOnLineRef[0] > 0) { sb.append("  ") }
             sb.append("R ${quantizeDuration(restTicks, tpq)}")
             notesOnLineRef[0]++
@@ -71,10 +33,9 @@ func emitGapWithTempos(sb: StringBuilder, gapStart: UInt32, gapEnd: UInt32,
     }
 }
 
-// 格式化单个轨道的音符序列（支持内联速度变化）
+// 格式化单个轨道的音符序列
 func formatNotes(sb: StringBuilder, notes: ArrayList<DecodedNote>,
-                 tpq: UInt16, tempoChanges: ArrayList<DecodedTempoChange>,
-                 firstTempoBPM: Int64): Unit {
+                 tpq: UInt16): Unit {
     var i: Int64 = 0
     var prevEndTick: UInt32 = 0
     let chordTolerance: UInt32 = UInt32(Int64(tpq) / CHORD_TOLERANCE_DIV)
@@ -83,18 +44,6 @@ func formatNotes(sb: StringBuilder, notes: ArrayList<DecodedNote>,
     // 使用 ArrayList 模拟可变引用
     let notesOnLineRef = ArrayList<Int64>()
     notesOnLineRef.add(0)
-    let tempoIdxRef = ArrayList<Int64>()
-    tempoIdxRef.add(0)
-
-    // 跳过 tick=0 处与初始 BPM 相同的速度变化（已在头部输出）
-    while (tempoIdxRef[0] < tempoChanges.size) {
-        let tc = tempoChanges[tempoIdxRef[0]]
-        if (tc.tick == 0 && tc.bpm == firstTempoBPM) {
-            tempoIdxRef[0]++
-        } else {
-            break
-        }
-    }
 
     while (i < notes.size) {
         // 查找同时开始的音符组（和弦检测）
@@ -108,20 +57,9 @@ func formatNotes(sb: StringBuilder, notes: ArrayList<DecodedNote>,
 
         let groupStart = notes[i].startTick
 
-        // 在间隙内交错输出休止符和速度变化
+        // 检测并插入休止符
         if (groupStart > prevEndTick) {
-            emitGapWithTempos(sb, prevEndTick, groupStart, tempoChanges,
-                              tempoIdxRef, tpq, notesOnLineRef, restThreshold)
-        } else {
-            // 即使没有间隙，仍需输出到达此时间点的速度变化
-            while (tempoIdxRef[0] < tempoChanges.size && tempoChanges[tempoIdxRef[0]].tick <= groupStart) {
-                if (notesOnLineRef[0] > 0) {
-                    sb.append("\n")
-                    notesOnLineRef[0] = 0
-                }
-                sb.append("TEMPO ${tempoChanges[tempoIdxRef[0]].bpm}\n")
-                tempoIdxRef[0]++
-            }
+            emitGapRest(sb, prevEndTick, groupStart, tpq, notesOnLineRef, restThreshold)
         }
 
         // 输出单音或和弦
@@ -159,24 +97,12 @@ func formatNotes(sb: StringBuilder, notes: ArrayList<DecodedNote>,
         i = groupEnd
     }
 
-    // 输出剩余的速度变化（在所有音符之后）
-    while (tempoIdxRef[0] < tempoChanges.size) {
-        if (notesOnLineRef[0] > 0) {
-            sb.append("\n")
-            notesOnLineRef[0] = 0
-        }
-        sb.append("TEMPO ${tempoChanges[tempoIdxRef[0]].bpm}\n")
-        tempoIdxRef[0]++
-    }
-
     if (notesOnLineRef[0] > 0) { sb.append("\n") }
 }
 
 // 格式化单个轨道（通道、乐器、力度、音符）
 func formatTrack(sb: StringBuilder, track: DecodedTrack,
-                 trackIdx: Int64, isMultiTrack: Bool, tpq: UInt16,
-                 tempoChanges: ArrayList<DecodedTempoChange>,
-                 firstTempoBPM: Int64): Unit {
+                 trackIdx: Int64, isMultiTrack: Bool, tpq: UInt16): Unit {
     if (isMultiTrack) {
         sb.append("\nTRACK track${trackIdx + 1}\n")
     }
@@ -195,9 +121,7 @@ func formatTrack(sb: StringBuilder, track: DecodedTrack,
         sb.append("VELOCITY ${track.avgVelocity}\n")
     }
 
-    // 仅第一个含音符的轨道传递速度变化
-    let trackTempos = if (trackIdx == 0) { tempoChanges } else { ArrayList<DecodedTempoChange>() }
-    formatNotes(sb, track.notes, tpq, trackTempos, firstTempoBPM)
+    formatNotes(sb, track.notes, tpq)
 }
 
 // ── 反编译主函数 ──
@@ -263,11 +187,18 @@ public func decompile(data: Array<UInt8>): String {
     let sb = StringBuilder()
     sb.append("TEMPO ${firstTempoBPM}\n")
 
+    // 输出所有速度变化（使用绝对 tick 位置，缩放到 TPQ=480）
+    for (tc in allTempoChanges) {
+        // 跳过初始速度（已在 TEMPO 行输出）
+        if (tc.tick == 0 && tc.bpm == firstTempoBPM) { continue }
+        let scaledTick = scaleTicks(tc.tick, tpq)
+        sb.append("TEMPO_AT ${scaledTick} ${tc.bpm}\n")
+    }
+
     let isMultiTrack = decodedTracks.size > 1
     var trackIdx: Int64 = 0
     while (trackIdx < decodedTracks.size) {
-        formatTrack(sb, decodedTracks[trackIdx], trackIdx, isMultiTrack, tpq,
-                    allTempoChanges, firstTempoBPM)
+        formatTrack(sb, decodedTracks[trackIdx], trackIdx, isMultiTrack, tpq)
         trackIdx++
     }
 

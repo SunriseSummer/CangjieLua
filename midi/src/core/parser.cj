@@ -315,6 +315,18 @@ public func parseScore(input: String): ScoreData {
         let stripped = stripComment(line).trimAscii()
         if (stripped.isEmpty()) { continue }
 
+        if (stripped.startsWith("TEMPO_AT")) {
+            let parts = splitWhitespace(stripped)
+            if (parts.size >= 3) {
+                try {
+                    let tick = UInt32.parse(parts[1])
+                    let bpm = Int64.parse(parts[2])
+                    score.tempoChanges.add(TempoEntry(tick, bpm))
+                } catch (_: Exception) {}
+            }
+            continue
+        }
+
         if (stripped.startsWith("TEMPO")) {
             let parts = splitWhitespace(stripped)
             if (parts.size >= 2) {
