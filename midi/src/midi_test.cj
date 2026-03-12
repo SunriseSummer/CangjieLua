@@ -243,6 +243,107 @@ class MidiTests {
         verifyExternalMid("testcase/test3.mid")
     }
 
+    // ── 测试 9: 附点音符支持 ──
+    @TestCase
+    func dottedNoteDurations() {
+        let input =
+            "TEMPO 120\n" +
+            "INSTRUMENT piano\n" +
+            "C4 4.  D4 8.  E4 2.  F4 16.\n"
+        let data = generate(input)
+        @Assert(verifyMThd(data, 0, 1))
+
+        // 反编译后应保留附点记号
+        let text = decompile(data)
+        @Assert(text.contains("4."))
+        @Assert(text.contains("8."))
+        @Assert(text.contains("2."))
+
+        // 再编码应保持音符数量一致
+        let data2 = generate(text)
+        let p1 = extractNoteOnPitches(data)
+        let p2 = extractNoteOnPitches(data2)
+        @Expect(p1.size, p2.size)
+    }
+
+    // ── 测试 10: 原始 tick 时值支持 ──
+    @TestCase
+    func rawTickDurations() {
+        let input =
+            "TEMPO 120\n" +
+            "INSTRUMENT piano\n" +
+            "C4 T216  D4 T432  R T100  E4 T108\n"
+        let data = generate(input)
+        @Assert(verifyMThd(data, 0, 1))
+
+        let pitches = extractNoteOnPitches(data)
+        @Expect(pitches.size, 3)
+
+        let text = decompile(data)
+        // 原始 tick 值应保留
+        @Assert(text.contains("T216"))
+        @Assert(text.contains("T432"))
+        @Assert(text.contains("T108"))
+    }
+
+    // ── 测试 11: CHANNEL 指令和通道保持 ──
+    @TestCase
+    func channelPreservation() {
+        let input =
+            "TEMPO 120\n" +
+            "\nTRACK melody\n" +
+            "CHANNEL 1\n" +
+            "INSTRUMENT bright_piano\n" +
+            "C4 4  D4 4\n" +
+            "\nTRACK drums\n" +
+            "CHANNEL 9\n" +
+            "INSTRUMENT piano\n" +
+            "C4 32  D4 32\n"
+        let data = generate(input)
+        @Assert(verifyMThd(data, 1, 2))
+
+        // 反编译后应保留通道信息
+        let text = decompile(data)
+        @Assert(text.contains("CHANNEL 1"))
+        @Assert(text.contains("CHANNEL 9"))
+    }
+
+    // ── 测试 12: TEMPO_AT 绝对速度变化 ──
+    @TestCase
+    func tempoAtAbsolutePositioning() {
+        let input =
+            "TEMPO 120\n" +
+            "TEMPO_AT 480 100\n" +
+            "TEMPO_AT 960 140\n" +
+            "\nTRACK melody\n" +
+            "INSTRUMENT piano\n" +
+            "C4 4  D4 4  E4 4  F4 4\n"
+        let data = generate(input)
+        // 应有速度轨道 + 音符轨道 = 2 轨道
+        @Assert(verifyMThd(data, 1, 2))
+        @Assert(countTracks(data), 2)
+        @Assert(verifyTempo(data, 120))
+
+        // 反编译应保留 TEMPO_AT
+        let text = decompile(data)
+        @Assert(text.contains("TEMPO_AT"))
+        @Assert(text.contains("100"))
+        @Assert(text.contains("140"))
+    }
+
+    // ── 测试 13: 速度四舍五入精度 ──
+    @TestCase
+    func tempoRoundingPrecision() {
+        // 原始文件 test.mid 的速度为 857142 微秒 (≈70.0 BPM)
+        // 修复前：截断为 69 BPM，修复后：四舍五入为 70 BPM
+        let midPath = Path("testcase/test.mid")
+        if (!exists(midPath)) { return }
+
+        let text = decompile(File.readFrom(midPath))
+        // 应包含 TEMPO 70（而非修复前的 TEMPO 69）
+        @Assert(text.contains("TEMPO 70"))
+    }
+
     // 辅助: 验证外部 .mid 文件反编译
     func verifyExternalMid(midPath: String) {
         let p = Path(midPath)

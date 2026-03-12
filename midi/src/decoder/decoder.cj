@@ -15,13 +15,35 @@ let MAX_INIT_DURATION: UInt32 = 999999 // 和弦最小时值初始值
 
 // ── 轨道文本格式化 ──
 
+// 在指定区间内输出休止符（无速度变化交错，速度变化使用 TEMPO_AT）
+func emitGapRest(sb: StringBuilder, gapStart: UInt32, gapEnd: UInt32,
+                 tpq: UInt16, notesOnLineRef: ArrayList<Int64>,
+                 restThreshold: UInt32): Unit {
+    if (gapEnd > gapStart) {
+        let restTicks = gapEnd - gapStart
+        if (restTicks >= restThreshold) {
+            if (notesOnLineRef[0] > 0) { sb.append("  ") }
+            sb.append("R ${quantizeDuration(restTicks, tpq)}")
+            notesOnLineRef[0]++
+            if (notesOnLineRef[0] >= MAX_NOTES_PER_LINE) {
+                sb.append("\n")
+                notesOnLineRef[0] = 0
+            }
+        }
+    }
+}
+
 // 格式化单个轨道的音符序列
-func formatNotes(sb: StringBuilder, notes: ArrayList<DecodedNote>, tpq: UInt16): Unit {
+func formatNotes(sb: StringBuilder, notes: ArrayList<DecodedNote>,
+                 tpq: UInt16): Unit {
     var i: Int64 = 0
     var prevEndTick: UInt32 = 0
-    var notesOnLine: Int64 = 0
     let chordTolerance: UInt32 = UInt32(Int64(tpq) / CHORD_TOLERANCE_DIV)
     let restThreshold: UInt32 = UInt32(Int64(tpq) / REST_THRESHOLD_DIV)
+
+    // 使用 ArrayList 模拟可变引用
+    let notesOnLineRef = ArrayList<Int64>()
+    notesOnLineRef.add(0)
 
     while (i < notes.size) {
         // 查找同时开始的音符组（和弦检测）
@@ -37,28 +59,19 @@ func formatNotes(sb: StringBuilder, notes: ArrayList<DecodedNote>, tpq: UInt16):
 
         // 检测并插入休止符
         if (groupStart > prevEndTick) {
-            let gap = groupStart - prevEndTick
-            if (gap >= restThreshold) {
-                if (notesOnLine > 0) { sb.append("  ") }
-                sb.append("R ${quantizeDuration(gap, tpq)}")
-                notesOnLine++
-                if (notesOnLine >= MAX_NOTES_PER_LINE) {
-                    sb.append("\n")
-                    notesOnLine = 0
-                }
-            }
+            emitGapRest(sb, prevEndTick, groupStart, tpq, notesOnLineRef, restThreshold)
         }
 
         // 输出单音或和弦
         if (groupEnd - i == 1) {
             let note = notes[i]
-            if (notesOnLine > 0) { sb.append("  ") }
+            if (notesOnLineRef[0] > 0) { sb.append("  ") }
             sb.append("${pitchToName(note.pitch)} ${quantizeDuration(note.durationTicks, tpq)}")
-            notesOnLine++
+            notesOnLineRef[0]++
             let endTick = note.startTick + note.durationTicks
             if (endTick > prevEndTick) { prevEndTick = endTick }
         } else {
-            if (notesOnLine > 0) { sb.append("  ") }
+            if (notesOnLineRef[0] > 0) { sb.append("  ") }
             sb.append("[")
             var minDur: UInt32 = MAX_INIT_DURATION
             var maxEnd: UInt32 = 0
@@ -72,26 +85,31 @@ func formatNotes(sb: StringBuilder, notes: ArrayList<DecodedNote>, tpq: UInt16):
                 ci++
             }
             sb.append("] ${quantizeDuration(minDur, tpq)}")
-            notesOnLine++
+            notesOnLineRef[0]++
             if (maxEnd > prevEndTick) { prevEndTick = maxEnd }
         }
 
-        if (notesOnLine >= MAX_NOTES_PER_LINE) {
+        if (notesOnLineRef[0] >= MAX_NOTES_PER_LINE) {
             sb.append("\n")
-            notesOnLine = 0
+            notesOnLineRef[0] = 0
         }
 
         i = groupEnd
     }
 
-    if (notesOnLine > 0) { sb.append("\n") }
+    if (notesOnLineRef[0] > 0) { sb.append("\n") }
 }
 
-// 格式化单个轨道（乐器、力度、音符）
+// 格式化单个轨道（通道、乐器、力度、音符）
 func formatTrack(sb: StringBuilder, track: DecodedTrack,
                  trackIdx: Int64, isMultiTrack: Bool, tpq: UInt16): Unit {
     if (isMultiTrack) {
         sb.append("\nTRACK track${trackIdx + 1}\n")
+    }
+
+    // 输出 MIDI 通道（仅非默认情况）
+    if (track.channel >= 0) {
+        sb.append("CHANNEL ${track.channel}\n")
     }
 
     let instrName = if (track.instrument >= 0) {
@@ -121,8 +139,8 @@ public func decompile(data: Array<UInt8>): String {
     let numTracks = Int64(decReadU16(data, 10))
     let tpq = decReadU16(data, 12)
 
-    // 解码所有轨道
-    var tempoBPM: Int64 = 120
+    // 解码所有轨道，收集速度变化
+    let allTempoChanges = ArrayList<DecodedTempoChange>()
     let decodedTracks = ArrayList<DecodedTrack>()
     var pos: Int64 = 14
     var ti: Int64 = 0
@@ -137,16 +155,35 @@ public func decompile(data: Array<UInt8>): String {
         let trackEnd = trackStart + trackLen
 
         let result = decodeTrackData(data, trackStart, trackEnd, tpq)
-        if (result[1] > 0) { tempoBPM = result[1] }
-        if (result[0].notes.size > 0) { decodedTracks.add(result[0]) }
+        // 收集所有速度变化
+        for (tc in result.tempoChanges) {
+            allTempoChanges.add(tc)
+        }
+        if (result.track.notes.size > 0) { decodedTracks.add(result.track) }
 
         pos = trackEnd
         ti++
     }
 
+    // 按 tick 排序速度变化
+    sortTempoChanges(allTempoChanges)
+
+    // 确定初始速度
+    let firstTempoBPM: Int64 = if (allTempoChanges.size > 0) {
+        allTempoChanges[0].bpm
+    } else { Int64(120) }
+
     // 生成文本输出
     let sb = StringBuilder()
-    sb.append("TEMPO ${tempoBPM}\n")
+    sb.append("TEMPO ${firstTempoBPM}\n")
+
+    // 输出所有速度变化（使用绝对 tick 位置，缩放到 TPQ=480）
+    for (tc in allTempoChanges) {
+        // 跳过初始速度（已在 TEMPO 行输出）
+        if (tc.tick == 0 && tc.bpm == firstTempoBPM) { continue }
+        let scaledTick = scaleTicks(tc.tick, tpq)
+        sb.append("TEMPO_AT ${scaledTick} ${tc.bpm}\n")
+    }
 
     let isMultiTrack = decodedTracks.size > 1
     var trackIdx: Int64 = 0

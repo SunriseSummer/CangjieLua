@@ -12,7 +12,7 @@ let DEFAULT_VELOCITY: UInt8 = 80      // 默认音符力度
 
 // 将一条轨道的音乐元素转换为 MIDI 事件序列
 func buildTrackEvents(trackData: TrackData, tempo: Int64,
-                      channel: UInt8): ArrayList<TimedEvent> {
+                       channel: UInt8, isFirstTrack: Bool): ArrayList<TimedEvent> {
     let events = ArrayList<TimedEvent>()
     var pendingDelta: UInt32 = 0
 
@@ -24,7 +24,7 @@ func buildTrackEvents(trackData: TrackData, tempo: Int64,
     }
 
     // 首轨道写入 Set Tempo 事件
-    if (channel == 0) {
+    if (isFirstTrack) {
         events.add(TimedEvent(0, MidiEvent.setTempo(UInt32(60000000 / tempo))))
     }
 
@@ -58,6 +58,11 @@ func buildTrackEvents(trackData: TrackData, tempo: Int64,
 
             case MusicElement.Rest(ticks) =>
                 pendingDelta += ticks
+
+            case MusicElement.TempoChange(bpm) =>
+                // 内联速度变化
+                events.add(TimedEvent(pendingDelta, MidiEvent.setTempo(UInt32(60000000 / bpm))))
+                pendingDelta = 0
         }
     }
 
@@ -84,17 +89,58 @@ func encodeTrackChunk(events: ArrayList<TimedEvent>): ArrayList<UInt8> {
 // 核心入口：文本乐谱 → MIDI 文件字节数组
 public func generate(input: String): Array<UInt8> {
     let score = parseScore(input)
-    let trackCount = score.tracks.size
-    let format: UInt16 = if (trackCount <= 1) { 0 } else { 1 }
 
     // 逐轨道编码
     let encodedTracks = ArrayList<ArrayList<UInt8>>()
-    var channelIdx: UInt8 = 0
-    for (td in score.tracks) {
-        encodedTracks.add(encodeTrackChunk(buildTrackEvents(td, score.tempo, channelIdx)))
-        channelIdx++
-        if (channelIdx == 9) { channelIdx = 10 }  // 跳过打击乐通道
+
+    // 如果有 TEMPO_AT 速度变化，创建专用速度轨道
+    if (score.tempoChanges.size > 0) {
+        let tempoEvents = ArrayList<TimedEvent>()
+        // 初始速度
+        tempoEvents.add(TimedEvent(0, MidiEvent.setTempo(UInt32(60000000 / score.tempo))))
+        // 按 tick 排序速度变化
+        let sorted = ArrayList<TempoEntry>()
+        for (tc in score.tempoChanges) { sorted.add(tc) }
+        var si: Int64 = 1
+        while (si < sorted.size) {
+            let key = sorted[si]
+            var sj = si - 1
+            while (sj >= 0 && sorted[sj].tick > key.tick) {
+                sorted[sj + 1] = sorted[sj]
+                sj--
+            }
+            sorted[sj + 1] = key
+            si++
+        }
+        // 使用绝对 tick 位置计算 delta time
+        var prevTick: UInt32 = 0
+        for (tc in sorted) {
+            let delta = if (tc.tick > prevTick) { tc.tick - prevTick } else { UInt32(0) }
+            tempoEvents.add(TimedEvent(delta, MidiEvent.setTempo(UInt32(60000000 / tc.bpm))))
+            prevTick = tc.tick
+        }
+        tempoEvents.add(TimedEvent(0, MidiEvent.endOfTrack()))
+        encodedTracks.add(encodeTrackChunk(tempoEvents))
     }
+
+    var channelIdx: UInt8 = 0
+    var isFirst = score.tempoChanges.size == 0  // 无 TEMPO_AT 时首轨道写入初始速度
+    for (td in score.tracks) {
+        // 确定 MIDI 通道：优先使用显式指定值
+        let ch: UInt8 = if (td.channel >= 0 && td.channel <= 15) {
+            UInt8(td.channel)
+        } else {
+            let assigned = channelIdx
+            channelIdx++
+            if (channelIdx == 9) { channelIdx = 10 }  // 跳过打击乐通道
+            assigned
+        }
+        encodedTracks.add(encodeTrackChunk(buildTrackEvents(td, score.tempo, ch, isFirst)))
+        isFirst = false
+    }
+
+    let trackCount = encodedTracks.size
+    let format: UInt16 = if (trackCount <= 1) { 0 } else { 1 }
 
     // 组装 MThd + MTrk 块
     let result = ArrayList<UInt8>()

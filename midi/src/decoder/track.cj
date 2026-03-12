@@ -65,17 +65,28 @@ func sortNotes(notes: ArrayList<DecodedNote>): Unit {
 
 // ── 轨道解码主函数 ──
 
-// 解析单个 MTrk 的二进制事件，返回 (解码轨道, tempo BPM)
+// 解码结果：(解码轨道, tempo 变化列表)
+class TrackDecodeResult {
+    var track: DecodedTrack
+    var tempoChanges: ArrayList<DecodedTempoChange>
+    init(track: DecodedTrack, tempoChanges: ArrayList<DecodedTempoChange>) {
+        this.track = track
+        this.tempoChanges = tempoChanges
+    }
+}
+
+// 解析单个 MTrk 的二进制事件，返回解码结果
 func decodeTrackData(data: Array<UInt8>, trackStart: Int64,
-                     trackEnd: Int64, tpq: UInt16): (DecodedTrack, Int64) {
+                     trackEnd: Int64, tpq: UInt16): TrackDecodeResult {
     let track = DecodedTrack()
-    var tempoBPM: Int64 = 0
+    let tempoChanges = ArrayList<DecodedTempoChange>()
     var j = trackStart
     var absTime: UInt32 = 0
     var runningStatus: UInt8 = 0
     let pending = ArrayList<PendingNote>()
     var totalVel: Int64 = 0
     var velCount: Int64 = 0
+    var detectedChannel: Int64 = -1
 
     while (j < trackEnd && j < data.size) {
         // 读取 delta-time
@@ -94,14 +105,16 @@ func decodeTrackData(data: Array<UInt8>, trackStart: Int64,
         }
 
         let eventType = status & 0xF0
+        let channel = status & 0x0F
 
         // NoteOn (0x90)
         if (eventType == 0x90 && j + 1 < trackEnd) {
             let pitch = data[j]
             let vel = data[j + 1]
             j += 2
+            if (detectedChannel < 0) { detectedChannel = Int64(channel) }
             if (vel > 0) {
-                pending.add(PendingNote(pitch, absTime, vel))
+                pending.add(PendingNote(pitch, absTime, vel, channel))
                 totalVel += Int64(vel)
                 velCount++
             } else {
@@ -129,7 +142,11 @@ func decodeTrackData(data: Array<UInt8>, trackStart: Int64,
             // Set Tempo (FF 51 03)
             if (metaType == 0x51 && metaLen == 3 && j + 2 < trackEnd) {
                 let micro = UInt32(data[j]) << 16 | UInt32(data[j + 1]) << 8 | UInt32(data[j + 2])
-                if (micro > 0) { tempoBPM = 60000000 / Int64(micro) }
+                if (micro > 0) {
+                    // 使用四舍五入代替截断
+                    let bpm = (60000000 + Int64(micro) / 2) / Int64(micro)
+                    tempoChanges.add(DecodedTempoChange(absTime, bpm))
+                }
             }
             j += metaLen
             runningStatus = 0
@@ -154,10 +171,13 @@ func decodeTrackData(data: Array<UInt8>, trackStart: Int64,
 
     flushPending(pending, track.notes, absTime, tpq)
 
+    // 记录检测到的 MIDI 通道
+    track.channel = detectedChannel
+
     // 计算平均力度
     if (velCount > 0) { track.avgVelocity = totalVel / velCount }
 
     sortNotes(track.notes)
 
-    (track, tempoBPM)
+    TrackDecodeResult(track, tempoChanges)
 }
