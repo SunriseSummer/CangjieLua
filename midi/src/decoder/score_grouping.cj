@@ -45,19 +45,24 @@ func groupNotesIntoChords(notes: ArrayList<PairedNote>, tpq: Int64): ArrayList<S
         } else {
             // 多个音符同时开始：统一为和弦
             // 时值不同时使用最短时值，保证同时发声的音符不被拆分为顺序播放
-            let chordNotes = ArrayList<PairedNote>()
+
+            // 先扫描最短时值
             var minDur = note.durationTicks
+            var si = i + 1
+            while (si < j) {
+                if (notes[si].durationTicks < minDur) {
+                    minDur = notes[si].durationTicks
+                }
+                si++
+            }
+
+            // 构建和弦，直接使用统一的最短时值
+            let chordNotes = ArrayList<PairedNote>()
             var ci = i
             while (ci < j) {
+                notes[ci].durationTicks = minDur
                 chordNotes.add(notes[ci])
-                if (notes[ci].durationTicks < minDur) {
-                    minDur = notes[ci].durationTicks
-                }
                 ci++
-            }
-            // 统一使用最短时值
-            for (cn in chordNotes) {
-                cn.durationTicks = minDur
             }
             lines.add(ScoreLine.ChordLine(chordNotes))
             currentTick = note.startTick + minDur

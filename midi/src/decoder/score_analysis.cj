@@ -187,7 +187,8 @@ func applyIOIDurations(notes: ArrayList<PairedNote>, tpq: Int64): Unit {
         }
         let origEnd = curr.startTick + curr.durationTicks
         let gap = if (next.startTick > origEnd) { next.startTick - origEnd } else { UInt32(0) }
-        // 仅在间隙较小（音符间有短暂断开或轻微重叠）时考虑 IOI 替换
+        // 仅在间隙不超过时值的 1/4 时考虑 IOI 替换
+        // 使用 1/4 而非 1/2，以更保守地保留原始时值，避免跨拍替换
         if (gap < curr.durationTicks / 4) {
             // 比较原始时值和 IOI 哪个更接近标准时值
             let origDist = distToStandardDuration(curr.durationTicks, tpq)
