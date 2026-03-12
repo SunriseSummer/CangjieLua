@@ -43,29 +43,39 @@ func groupNotesIntoChords(notes: ArrayList<PairedNote>, tpq: Int64): ArrayList<S
             lines.add(ScoreLine.NoteLine(note))
             currentTick = note.startTick + note.durationTicks
         } else {
-            // 多个音符同时开始：统一为和弦
-            // 时值不同时使用最短时值，保证同时发声的音符不被拆分为顺序播放
-
-            // 先扫描最短时值
-            var minDur = note.durationTicks
-            var si = i + 1
-            while (si < j) {
-                if (notes[si].durationTicks < minDur) {
-                    minDur = notes[si].durationTicks
+            // 多个音符：检查时值是否一致（和弦判定）
+            var allSameDuration = true
+            var ki = i + 1
+            while (ki < j) {
+                if (notes[ki].durationTicks != note.durationTicks) {
+                    allSameDuration = false
+                    break
                 }
-                si++
+                ki++
             }
 
-            // 构建和弦，直接使用统一的最短时值
-            let chordNotes = ArrayList<PairedNote>()
-            var ci = i
-            while (ci < j) {
-                notes[ci].durationTicks = minDur
-                chordNotes.add(notes[ci])
-                ci++
+            if (allSameDuration) {
+                // 时值相同：合并为和弦
+                let chordNotes = ArrayList<PairedNote>()
+                var ci = i
+                while (ci < j) {
+                    chordNotes.add(notes[ci])
+                    ci++
+                }
+                lines.add(ScoreLine.ChordLine(chordNotes))
+                currentTick = note.startTick + note.durationTicks
+            } else {
+                // 时值不同：拆分为独立音符行
+                var ci = i
+                while (ci < j) {
+                    lines.add(ScoreLine.NoteLine(notes[ci]))
+                    let endTick = notes[ci].startTick + notes[ci].durationTicks
+                    if (endTick > currentTick) {
+                        currentTick = endTick
+                    }
+                    ci++
+                }
             }
-            lines.add(ScoreLine.ChordLine(chordNotes))
-            currentTick = note.startTick + minDur
         }
 
         i = j

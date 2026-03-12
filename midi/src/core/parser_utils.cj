@@ -56,9 +56,6 @@ func basePitch(noteRune: Rune): Int64 {
 // readNumber 中用于标记原始 tick 值的偏移量常量
 let RAW_TICK_OFFSET: Int64 = 10000
 
-// readNumber 中用于标记三连音时值的偏移量常量
-let TRIPLET_OFFSET: Int64 = 20000
-
 // 判断字符是否为合法音名（A-G）
 func isNoteName(ch: Rune): Bool {
     ch == r'A' || ch == r'B' || ch == r'C' || ch == r'D' ||
@@ -83,17 +80,11 @@ func runeToDigit(ch: Rune): Int64 {
 // ── 时值转换 ──
 
 // 将时值标记转换为 MIDI tick 数（基准：480 ticks = 四分音符）
-// duration > TRIPLET_OFFSET：三连音时值（基础时值 × 2/3）
 // duration > RAW_TICK_OFFSET：原始 tick 值（减去偏移量后返回）
 // duration < 0：附点音符（基础时值 × 1.5）
 // duration == 0：默认四分音符（480 ticks）
 func durationToTicks(duration: Int64): UInt32 {
     if (duration == 0) { return 480 }
-    // 三连音时值
-    if (duration > TRIPLET_OFFSET) {
-        let base = UInt32(480 * 4 / (duration - TRIPLET_OFFSET))
-        return base * 2 / 3
-    }
     // 原始 tick 值（readNumber 添加了 RAW_TICK_OFFSET 偏移）
     if (duration > RAW_TICK_OFFSET) {
         return UInt32(duration - RAW_TICK_OFFSET)
@@ -109,7 +100,7 @@ func durationToTicks(duration: Int64): UInt32 {
 // ── 基本解析函数 ──
 
 // 从 runes 数组的 startPos 位置读取一个时值数字
-// 支持格式：4（标准时值）、4.（附点，返回 -4）、4t（三连音，返回 4+TRIPLET_OFFSET）、T216（原始 tick，返回 216+RAW_TICK_OFFSET）
+// 支持格式：4（标准时值）、4.（附点，返回 -4）、T216（原始 tick，返回 216+偏移）
 func readNumber(runes: Array<Rune>, startPos: Int64, size: Int64): NumberResult {
     var i = startPos
 
@@ -143,11 +134,6 @@ func readNumber(runes: Array<Rune>, startPos: Int64, size: Int64): NumberResult 
     if (i < size && runes[i] == r'.') {
         i++
         return NumberResult(-num, i)  // 负值表示附点
-    }
-    // 检测三连音记号（"t"）
-    if (i < size && runes[i] == r't') {
-        i++
-        return NumberResult(num + TRIPLET_OFFSET, i)  // TRIPLET_OFFSET 标记三连音
     }
     NumberResult(num, i)
 }
