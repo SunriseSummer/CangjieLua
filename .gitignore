@@ -31,8 +31,9 @@ cangjie-sdk-*.tar.gz
 Thumbs.db
 
 # Generated MIDI test files
-midi/tests/*.mid
+midi/tests/
 midi/testcase/**/*.mid
+midi/testcase/**/*_decompiled.txt
 
 # Cangjie docs (downloaded)
 .cangjie-docs/

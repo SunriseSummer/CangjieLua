@@ -2,6 +2,8 @@ package midi
 
 import std.collection.*
 import std.fs.*
+import midi.encoder.*
+import midi.decoder.*
 
 // ============================================================
 // MIDI 音乐生成器 — 入口
@@ -52,134 +54,95 @@ func process(path: String): Unit {
     }
 }
 
-// 测试 10: 小星星变奏曲 — 三轨完整编曲 [20分]
-func test10_TwinkleVariation(): Bool {
-    let input =
-        "TEMPO 108\n" +
-        "\n" +
-        "// 轨道1: 钢琴旋律\n" +
-        "TRACK melody\n" +
-        "INSTRUMENT piano\n" +
-        "C4 4  C4 4  G4 4  G4 4\n" +
-        "A4 4  A4 4  G4 2\n" +
-        "F4 4  F4 4  E4 4  E4 4\n" +
-        "D4 4  D4 4  C4 2\n" +
-        "G4 4  G4 4  F4 4  F4 4\n" +
-        "E4 4  E4 4  D4 2\n" +
-        "G4 8  G4 8  G4 8  F#4 8  F4 4  F4 4\n" +
-        "E4 4  E4 4  D4 2\n" +
-        "C4 4  C4 4  G4 4  G4 4\n" +
-        "A4 4  A4 4  G4 2\n" +
-        "F4 4  F4 4  E4 4  E4 4\n" +
-        "D4 4  D4 4  C4 2\n" +
-        "\n" +
-        "// 轨道2: 弦乐和弦伴奏\n" +
-        "TRACK harmony\n" +
-        "INSTRUMENT strings\n" +
-        "[C3 E3 G3] 2  [C3 E3 G3] 2\n" +
-        "[F3 A3 C4] 2  [C3 E3 G3] 2\n" +
-        "[F3 A3 C4] 2  [C3 E3 G3] 2\n" +
-        "[G3 B3 D4] 2  [C3 E3 G3] 2\n" +
-        "[C3 E3 G3] 2  [G3 B3 D4] 2\n" +
-        "[A3 C4 E4] 2  [G3 B3 D4] 2\n" +
-        "[C3 E3 G3] 2  [G3 B3 D4] 2\n" +
-        "[A3 C4 E4] 2  [G3 B3 D4] 2\n" +
-        "[C3 E3 G3] 2  [C3 E3 G3] 2\n" +
-        "[F3 A3 C4] 2  [C3 E3 G3] 2\n" +
-        "[F3 A3 C4] 2  [C3 E3 G3] 2\n" +
-        "[G3 B3 D4] 2  [C3 E3 G3] 2\n" +
-        "\n" +
-        "// 轨道3: 贝斯低音线\n" +
-        "TRACK bass\n" +
-        "INSTRUMENT bass\n" +
-        "C2 2  E2 2\n" +
-        "F2 2  C2 2\n" +
-        "F2 2  C2 2\n" +
-        "G2 2  C2 2\n" +
-        "C2 2  G2 2\n" +
-        "A2 2  G2 2\n" +
-        "C2 2  G2 2\n" +
-        "A2 2  G2 2\n" +
-        "C2 2  E2 2\n" +
-        "F2 2  C2 2\n" +
-        "F2 2  C2 2\n" +
-        "G2 2  C2 2"
-    let data = generate(input)
-    if (!verifyMThd(data, 1, 3)) { return false }
-    let trackCount = countTracks(data)
-    if (trackCount != 3) {
-        println("  ERROR: MTrk count: expected 3, got ${trackCount}")
-        return false
-    }
-    let programs = extractProgramChanges(data)
-    if (programs.size < 3) {
-        println("  ERROR: Expected 3 Program Changes, got ${programs.size}")
-        return false
-    }
-    if (programs[0] != 0) {
-        println("  ERROR: Track 1 should be piano (0), got ${programs[0]}")
-        return false
-    }
-    if (programs[1] != 48) {
-        println("  ERROR: Track 2 should be strings (48), got ${programs[1]}")
-        return false
-    }
-    if (programs[2] != 33) {
-        println("  ERROR: Track 3 should be bass (33), got ${programs[2]}")
-        return false
-    }
-    if (!verifyTempo(data, 108)) { return false }
+// 反编译单个 .mid 文件，生成同目录下的 .txt 文件
+func decompileFile(srcPath: Path): Unit {
+    let text = decompileToString(srcPath.toString())
+    let parent = srcPath.parent.toString()
+    let baseName = srcPath.fileNameWithoutExtension
+    let outPath = Path(parent).join("${baseName}_decompiled.txt")
+    File.writeTo(outPath, text.toArray())
+    println("  ✓ ${srcPath} -> ${outPath}")
+}
 
-    let pitches = extractNoteOnPitches(data)
-    var foundFSharp = false
-    for (p in pitches) {
-        if (p == 66) { foundFSharp = true; break }
+// 反编译路径：文件则反编译单个 .mid，目录则反编译目录下所有 .mid
+func decompileProcess(path: String): Unit {
+    let p = Path(path)
+    if (!exists(p)) {
+        println("错误: 路径不存在: ${path}")
+        return
     }
-    if (!foundFSharp) {
-        println("  ERROR: F#4 (66) not found in melody")
-        return false
+    let info = FileInfo(p)
+    if (info.isDirectory()) {
+        println("反编译目录: ${path}")
+        let entries = Directory.readFrom(p)
+        var count: Int64 = 0
+        for (entry in entries) {
+            if (entry.name.endsWith(".mid")) {
+                try {
+                    decompileFile(p.join(entry.name))
+                    count++
+                } catch (e: Exception) {
+                    println("  ✗ ${entry.name}: ${e}")
+                }
+            }
+        }
+        println("完成: ${count} 个文件已反编译")
+    } else {
+        println("反编译文件: ${path}")
+        try {
+            decompileFile(p)
+        } catch (e: Exception) {
+            println("  ✗ ${path}: ${e}")
+        }
     }
-    saveMidiFile("tests/test10_twinkle_variation.mid", data)
-    true
+}
+
+func printUsage(): Unit {
+    println("用法: midi [选项] [路径...]")
+    println()
+    println("选项:")
+    println("  -d, --decompile    反编译 .mid 文件为文本乐谱")
+    println("  -h, --help         显示帮助信息")
+    println()
+    println("提供路径时根据模式处理文件或目录:")
+    println("  默认模式: 将 .txt 乐谱编译为 .mid 文件")
+    println("  反编译模式: 将 .mid 文件反编译为 .txt 乐谱")
 }
 
 // 主入口
 main(args: Array<String>): Int64 {
-    if (args.size > 0) {
-        for (arg in args) {
-            process(arg)
+    var decompileMode = false
+    var showHelp = false
+    let paths = ArrayList<String>()
+
+    for (arg in args) {
+        if (arg == "--decompile" || arg == "-d") {
+            decompileMode = true
+        } else if (arg == "--help" || arg == "-h") {
+            showHelp = true
+        } else {
+            paths.add(arg)
         }
+    }
+
+    if (showHelp) {
+        printUsage()
         return 0
     }
 
-    println("═══════════════════════════════════════")
-    println("  🎵 MIDI 音乐生成器 — 测试套件")
-    println("═══════════════════════════════════════")
-    println()
-
-    // 创建 tests 目录
-    try {
-        Directory.create(Path("tests"))
-    } catch (_: Exception) {}
-
-    print("Test: 🌟 小星星变奏曲 — 三轨完整编曲 [20分] ... ")
-    let passed = test10_TwinkleVariation()
-    if (passed) {
-        println("PASS ✓")
-    } else {
-        println("FAIL ✗")
-    }
-
-    println()
-    println("═══════════════════════════════════════")
-    if (passed) {
-        println("  结果: 1 通过, 0 失败")
-        println("═══════════════════════════════════════")
-        println("\n🎉 测试通过！MIDI 文件保存在 tests/ 目录下。")
+    if (paths.size == 0) {
+        printUsage()
         return 0
-    } else {
-        println("  结果: 0 通过, 1 失败")
-        println("═══════════════════════════════════════")
-        return 1
     }
+
+    if (decompileMode) {
+        for (path in paths) {
+            decompileProcess(path)
+        }
+    } else {
+        for (path in paths) {
+            process(path)
+        }
+    }
+    return 0
 }

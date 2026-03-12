@@ -1,61 +1,15 @@
-package midi
+package midi.core
 
 import std.collection.*
 import std.convert.*
 
 // ============================================================
-// 解析器：文本乐谱 → MIDI 轨道数据
+// 文本乐谱解析器：文本 → ScoreData
 // ============================================================
 
-public class NoteInfo {
-    public var pitch: UInt8
-    public var durationTicks: UInt32
+// ── 解析辅助类型 ──
 
-    public init(pitch: UInt8, durationTicks: UInt32) {
-        this.pitch = pitch
-        this.durationTicks = durationTicks
-    }
-}
-
-public class ChordInfo {
-    public var pitches: ArrayList<UInt8>
-    public var durationTicks: UInt32
-
-    public init(pitches: ArrayList<UInt8>, durationTicks: UInt32) {
-        this.pitches = pitches
-        this.durationTicks = durationTicks
-    }
-}
-
-public enum MusicElement {
-    | SingleNote(NoteInfo)
-    | Chord(ChordInfo)
-    | Rest(UInt32)
-}
-
-public class TrackData {
-    var name: String
-    var instrument: Int64
-    var elements: ArrayList<MusicElement>
-
-    init(name: String) {
-        this.name = name
-        this.instrument = -1
-        this.elements = ArrayList<MusicElement>()
-    }
-}
-
-public class ScoreData {
-    public var tempo: Int64
-    public var tracks: ArrayList<TrackData>
-
-    public init() {
-        this.tempo = 120
-        this.tracks = ArrayList<TrackData>()
-    }
-}
-
-// 辅助结构代替元组
+// 数字解析结果
 class NumberResult {
     var value: Int64
     var newPos: Int64
@@ -65,6 +19,7 @@ class NumberResult {
     }
 }
 
+// 音符解析结果
 class NoteTokenResult {
     var pitch: Int64
     var ticks: Int64
@@ -76,6 +31,7 @@ class NoteTokenResult {
     }
 }
 
+// 和弦解析结果
 class ChordParseResult {
     var chord: ChordInfo
     var newPos: Int64
@@ -84,6 +40,8 @@ class ChordParseResult {
         this.newPos = newPos
     }
 }
+
+// ── 字符判断工具 ──
 
 // 音高基础值: C=0, D=2, E=4, F=5, G=7, A=9, B=11
 func basePitch(noteRune: Rune): Int64 {
@@ -97,28 +55,15 @@ func basePitch(noteRune: Rune): Int64 {
     return -1
 }
 
-// 乐器名 → GM 编号
-func instrumentNumber(name: String): Int64 {
-    let lower = name.toAsciiLower()
-    if (lower == "piano") { return 0 }
-    if (lower == "music_box") { return 10 }
-    if (lower == "guitar") { return 24 }
-    if (lower == "bass") { return 33 }
-    if (lower == "violin") { return 40 }
-    if (lower == "strings") { return 48 }
-    if (lower == "trumpet") { return 56 }
-    if (lower == "flute") { return 73 }
-    return 0
-}
-
-// 时值 → ticks (480 ticks/四分音符)
+// 时值 → ticks（480 ticks / 四分音符）
 func durationToTicks(duration: Int64): UInt32 {
     if (duration <= 0) { return 480 }
     UInt32(480 * 4 / duration)
 }
 
 func isNoteName(ch: Rune): Bool {
-    ch == r'A' || ch == r'B' || ch == r'C' || ch == r'D' || ch == r'E' || ch == r'F' || ch == r'G'
+    ch == r'A' || ch == r'B' || ch == r'C' || ch == r'D' ||
+    ch == r'E' || ch == r'F' || ch == r'G'
 }
 
 func isDigitRune(ch: Rune): Bool {
@@ -133,6 +78,9 @@ func runeToDigit(ch: Rune): Int64 {
     ch.position() - r'0'.position()
 }
 
+// ── 基本解析函数 ──
+
+// 从 runes 的 startPos 位置读取一个整数
 func readNumber(runes: Array<Rune>, startPos: Int64, size: Int64): NumberResult {
     var i = startPos
     var num: Int64 = 0
@@ -143,11 +91,12 @@ func readNumber(runes: Array<Rune>, startPos: Int64, size: Int64): NumberResult 
         found = true
     }
     if (!found) {
-        return NumberResult(4, i)
+        return NumberResult(4, i)   // 默认四分音符
     }
     NumberResult(num, i)
 }
 
+// 解析单个音符标记（如 C#4 8）
 func parseNoteToken(runes: Array<Rune>, startPos: Int64, size: Int64): NoteTokenResult {
     var i = startPos
     let base = basePitch(runes[i])
@@ -156,6 +105,7 @@ func parseNoteToken(runes: Array<Rune>, startPos: Int64, size: Int64): NoteToken
     }
     i++
 
+    // 升降号
     var offset: Int64 = 0
     if (i < size && runes[i] == r'#') {
         offset = 1
@@ -165,6 +115,7 @@ func parseNoteToken(runes: Array<Rune>, startPos: Int64, size: Int64): NoteToken
         i++
     }
 
+    // 八度
     if (i >= size || !isDigitRune(runes[i])) {
         return NoteTokenResult(-1, 0, i)
     }
@@ -173,10 +124,8 @@ func parseNoteToken(runes: Array<Rune>, startPos: Int64, size: Int64): NoteToken
 
     let pitch = (octave + 1) * 12 + base + offset
 
-    while (i < size && isSpaceRune(runes[i])) {
-        i++
-    }
-
+    // 跳过空白，读取时值
+    while (i < size && isSpaceRune(runes[i])) { i++ }
     let durResult = readNumber(runes, i, size)
     i = durResult.newPos
     let ticks = Int64(durationToTicks(durResult.value))
@@ -184,14 +133,14 @@ func parseNoteToken(runes: Array<Rune>, startPos: Int64, size: Int64): NoteToken
     NoteTokenResult(pitch, ticks, i)
 }
 
+// 解析和弦内容（[C3 E3 G3] 之间的部分）
 func parseChordContent(runes: Array<Rune>, startPos: Int64, size: Int64): ChordParseResult {
     var i = startPos
     let pitches = ArrayList<UInt8>()
 
     while (i < size && runes[i] != r']') {
-        while (i < size && runes[i] != r']' && isSpaceRune(runes[i])) {
-            i++
-        }
+        // 跳过空白
+        while (i < size && runes[i] != r']' && isSpaceRune(runes[i])) { i++ }
         if (i >= size || runes[i] == r']') { break }
 
         if (isNoteName(runes[i])) {
@@ -199,19 +148,13 @@ func parseChordContent(runes: Array<Rune>, startPos: Int64, size: Int64): ChordP
             i++
 
             var offset: Int64 = 0
-            if (i < size && runes[i] == r'#') {
-                offset = 1
-                i++
-            } else if (i < size && runes[i] == r'b') {
-                offset = -1
-                i++
-            }
+            if (i < size && runes[i] == r'#') { offset = 1; i++ }
+            else if (i < size && runes[i] == r'b') { offset = -1; i++ }
 
             if (i < size && isDigitRune(runes[i])) {
                 let octave = runeToDigit(runes[i])
                 i++
-                let pitch = (octave + 1) * 12 + base + offset
-                pitches.add(UInt8(pitch))
+                pitches.add(UInt8((octave + 1) * 12 + base + offset))
             }
         } else {
             i++
@@ -220,16 +163,17 @@ func parseChordContent(runes: Array<Rune>, startPos: Int64, size: Int64): ChordP
 
     if (i < size && runes[i] == r']') { i++ }
 
+    // 跳过空白，读取时值
     while (i < size && isSpaceRune(runes[i])) { i++ }
-
     let durResult = readNumber(runes, i, size)
     i = durResult.newPos
-    let ticks = durationToTicks(durResult.value)
 
-    ChordParseResult(ChordInfo(pitches, ticks), i)
+    ChordParseResult(ChordInfo(pitches, durationToTicks(durResult.value)), i)
 }
 
-// 去除行内注释
+// ── 行解析 ──
+
+// 去除行内注释（// 之后的内容）
 func stripComment(line: String): String {
     let runes = line.toRuneArray()
     let size = runes.size
@@ -245,13 +189,12 @@ func stripComment(line: String): String {
     sb.toString()
 }
 
-// 按空白分割
+// 按空白分割字符串
 func splitWhitespace(s: String): ArrayList<String> {
     let result = ArrayList<String>()
     var current = StringBuilder()
     var inWord = false
-    let runes = s.toRuneArray()
-    for (ch in runes) {
+    for (ch in s.toRuneArray()) {
         if (isSpaceRune(ch)) {
             if (inWord) {
                 result.add(current.toString())
@@ -263,13 +206,11 @@ func splitWhitespace(s: String): ArrayList<String> {
             inWord = true
         }
     }
-    if (inWord) {
-        result.add(current.toString())
-    }
+    if (inWord) { result.add(current.toString()) }
     result
 }
 
-// 解析一行音符
+// 解析一行音符/和弦/休止符
 func parseNoteLine(line: String, track: TrackData): Unit {
     let runes = line.toRuneArray()
     let size = runes.size
@@ -282,30 +223,31 @@ func parseNoteLine(line: String, track: TrackData): Unit {
         // 和弦 [...]
         if (runes[i] == r'[') {
             i++
-            let chordResult = parseChordContent(runes, i, size)
-            track.elements.add(MusicElement.Chord(chordResult.chord))
-            i = chordResult.newPos
+            let cr = parseChordContent(runes, i, size)
+            track.elements.add(MusicElement.Chord(cr.chord))
+            i = cr.newPos
             continue
         }
 
-        // 休止符
+        // 休止符 R
         if (runes[i] == r'R') {
             i++
             while (i < size && isSpaceRune(runes[i])) { i++ }
-            let durResult = readNumber(runes, i, size)
-            i = durResult.newPos
-            let ticks = durationToTicks(durResult.value)
-            track.elements.add(MusicElement.Rest(ticks))
+            let dr = readNumber(runes, i, size)
+            i = dr.newPos
+            track.elements.add(MusicElement.Rest(durationToTicks(dr.value)))
             continue
         }
 
         // 音符
         if (isNoteName(runes[i])) {
-            let noteResult = parseNoteToken(runes, i, size)
-            if (noteResult.pitch >= 0) {
-                track.elements.add(MusicElement.SingleNote(NoteInfo(UInt8(noteResult.pitch), UInt32(noteResult.ticks))))
+            let nr = parseNoteToken(runes, i, size)
+            if (nr.pitch >= 0) {
+                track.elements.add(
+                    MusicElement.SingleNote(NoteInfo(UInt8(nr.pitch), UInt32(nr.ticks)))
+                )
             }
-            i = noteResult.newPos
+            i = nr.newPos
             continue
         }
 
@@ -313,25 +255,36 @@ func parseNoteLine(line: String, track: TrackData): Unit {
     }
 }
 
-// 解析文本乐谱
+// ── 指令处理 ──
+
+// 处理 TEMPO 指令
+func handleTempo(parts: ArrayList<String>, score: ScoreData): Unit {
+    if (parts.size >= 2) {
+        try { score.tempo = Int64.parse(parts[1]) } catch (_: Exception) {}
+    }
+}
+
+// 处理 VELOCITY 指令
+func handleVelocity(parts: ArrayList<String>, track: TrackData): Unit {
+    if (parts.size >= 2) {
+        try { track.velocity = Int64.parse(parts[1]) } catch (_: Exception) {}
+    }
+}
+
+// ── 主解析函数 ──
+
+// 解析完整的文本乐谱
 public func parseScore(input: String): ScoreData {
     let score = ScoreData()
     var currentTrack = TrackData("default")
     var hasExplicitTrack = false
 
-    let lines = input.split("\n")
-
-    for (line in lines) {
+    for (line in input.split("\n")) {
         let stripped = stripComment(line).trimAscii()
         if (stripped.isEmpty()) { continue }
 
         if (stripped.startsWith("TEMPO")) {
-            let parts = splitWhitespace(stripped)
-            if (parts.size >= 2) {
-                try {
-                    score.tempo = Int64.parse(parts[1])
-                } catch (_: Exception) {}
-            }
+            handleTempo(splitWhitespace(stripped), score)
             continue
         }
 
@@ -340,6 +293,11 @@ public func parseScore(input: String): ScoreData {
             if (parts.size >= 2) {
                 currentTrack.instrument = instrumentNumber(parts[1])
             }
+            continue
+        }
+
+        if (stripped.startsWith("VELOCITY")) {
+            handleVelocity(splitWhitespace(stripped), currentTrack)
             continue
         }
 
@@ -360,7 +318,6 @@ public func parseScore(input: String): ScoreData {
     if (currentTrack.elements.size > 0 || hasExplicitTrack) {
         score.tracks.add(currentTrack)
     }
-
     if (score.tracks.size == 0) {
         score.tracks.add(TrackData("default"))
     }
