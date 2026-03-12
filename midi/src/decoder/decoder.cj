@@ -1,132 +1,101 @@
 package midi.decoder
 
-import std.collection.*
 import std.fs.*
-import midi.core.*
 
 // ============================================================
-// MIDI 反编译器：.mid 二进制 → 文本乐谱
+// MIDI 反编译器：.mid 二进制 → 无损原始事件文本
 // ============================================================
 
-let CHORD_TOLERANCE_DIV: Int64 = 16    // 和弦容差 = TPQ / 此值
-let REST_THRESHOLD_DIV: Int64 = 6      // 休止符阈值 = TPQ / 此值
-let MAX_NOTES_PER_LINE: Int64 = 4      // 每行最多音符/和弦数
-let MAX_INIT_DURATION: UInt32 = 999999 // 和弦最小时值初始值
+// ── 十六进制工具 ──
 
-// ── 轨道文本格式化 ──
+let HEX_CHARS: Array<Rune> = [
+    r'0', r'1', r'2', r'3', r'4', r'5', r'6', r'7',
+    r'8', r'9', r'A', r'B', r'C', r'D', r'E', r'F'
+]
 
-// 在指定区间内输出休止符（无速度变化交错，速度变化使用 TEMPO_AT）
-func emitGapRest(sb: StringBuilder, gapStart: UInt32, gapEnd: UInt32,
-                 tpq: UInt16, notesOnLineRef: ArrayList<Int64>,
-                 restThreshold: UInt32): Unit {
-    if (gapEnd > gapStart) {
-        let restTicks = gapEnd - gapStart
-        if (restTicks >= restThreshold) {
-            if (notesOnLineRef[0] > 0) { sb.append("  ") }
-            sb.append("R ${quantizeDuration(restTicks, tpq)}")
-            notesOnLineRef[0]++
-            if (notesOnLineRef[0] >= MAX_NOTES_PER_LINE) {
-                sb.append("\n")
-                notesOnLineRef[0] = 0
-            }
-        }
-    }
+// 单字节 → 两位大写十六进制字符串
+func byteToHex(b: UInt8): String {
+    let hi = HEX_CHARS[Int64(b >> 4)]
+    let lo = HEX_CHARS[Int64(b & 0x0F)]
+    "${hi}${lo}"
 }
 
-// 格式化单个轨道的音符序列
-func formatNotes(sb: StringBuilder, notes: ArrayList<DecodedNote>,
-                 tpq: UInt16): Unit {
-    var i: Int64 = 0
-    var prevEndTick: UInt32 = 0
-    let chordTolerance: UInt32 = UInt32(Int64(tpq) / CHORD_TOLERANCE_DIV)
-    let restThreshold: UInt32 = UInt32(Int64(tpq) / REST_THRESHOLD_DIV)
+// ── 轨道原始事件输出 ──
 
-    // 使用 ArrayList 模拟可变引用
-    let notesOnLineRef = ArrayList<Int64>()
-    notesOnLineRef.add(0)
+// 解码单个 MTrk 的二进制事件，输出每个事件为一行文本：
+//   <delta_decimal> <hex_bytes...>
+// 其中 hex_bytes 是事件在 MIDI 二进制中的原始字节（保留 Running Status）
+func decodeTrackRaw(sb: StringBuilder, data: Array<UInt8>,
+                    trackStart: Int64, trackEnd: Int64): Unit {
+    var j = trackStart
+    var runningStatus: UInt8 = 0
 
-    while (i < notes.size) {
-        // 查找同时开始的音符组（和弦检测）
-        var groupEnd = i + 1
-        while (groupEnd < notes.size) {
-            let diff = if (notes[groupEnd].startTick >= notes[i].startTick) {
-                notes[groupEnd].startTick - notes[i].startTick
-            } else { UInt32(0) }
-            if (diff <= chordTolerance) { groupEnd++ } else { break }
-        }
+    while (j < trackEnd && j < data.size) {
+        // 读取 VLQ delta-time
+        let vlq = decReadVLQ(data, j, trackEnd)
+        let delta = vlq.value
+        j = vlq.newPos
+        if (j >= trackEnd) { break }
 
-        let groupStart = notes[i].startTick
+        // 记录事件字节起始位置
+        let eventStart = j
+        let firstByte = data[j]
 
-        // 检测并插入休止符
-        if (groupStart > prevEndTick) {
-            emitGapRest(sb, prevEndTick, groupStart, tpq, notesOnLineRef, restThreshold)
-        }
-
-        // 输出单音或和弦
-        if (groupEnd - i == 1) {
-            let note = notes[i]
-            if (notesOnLineRef[0] > 0) { sb.append("  ") }
-            sb.append("${pitchToName(note.pitch)} ${quantizeDuration(note.durationTicks, tpq)}")
-            notesOnLineRef[0]++
-            let endTick = note.startTick + note.durationTicks
-            if (endTick > prevEndTick) { prevEndTick = endTick }
+        if (firstByte >= 0x80) {
+            // 新的 status 字节
+            if (firstByte == 0xFF) {
+                // Meta 事件: FF type vlq_len data...
+                j++ // FF
+                if (j >= trackEnd) { break }
+                j++ // type
+                let metaVLQ = decReadVLQ(data, j, trackEnd)
+                j = metaVLQ.newPos + Int64(metaVLQ.value)
+                runningStatus = 0
+            } else if (firstByte == 0xF0 || firstByte == 0xF7) {
+                // SysEx: F0/F7 vlq_len data...
+                j++ // status
+                let sysVLQ = decReadVLQ(data, j, trackEnd)
+                j = sysVLQ.newPos + Int64(sysVLQ.value)
+                runningStatus = 0
+            } else {
+                // Channel Voice/Mode 消息
+                let eventType = firstByte & 0xF0
+                runningStatus = firstByte
+                j++ // status
+                if (eventType == 0xC0 || eventType == 0xD0) {
+                    j += 1 // 1 个数据字节
+                } else {
+                    j += 2 // 2 个数据字节
+                }
+            }
         } else {
-            if (notesOnLineRef[0] > 0) { sb.append("  ") }
-            sb.append("[")
-            var minDur: UInt32 = MAX_INIT_DURATION
-            var maxEnd: UInt32 = 0
-            var ci = i
-            while (ci < groupEnd) {
-                if (ci > i) { sb.append(" ") }
-                sb.append(pitchToName(notes[ci].pitch))
-                if (notes[ci].durationTicks < minDur) { minDur = notes[ci].durationTicks }
-                let endTick = notes[ci].startTick + notes[ci].durationTicks
-                if (endTick > maxEnd) { maxEnd = endTick }
-                ci++
+            // Running Status（无 status 字节，复用上一个 status）
+            let eventType = runningStatus & 0xF0
+            if (eventType == 0xC0 || eventType == 0xD0) {
+                j += 1
+            } else {
+                j += 2
             }
-            sb.append("] ${quantizeDuration(minDur, tpq)}")
-            notesOnLineRef[0]++
-            if (maxEnd > prevEndTick) { prevEndTick = maxEnd }
         }
 
-        if (notesOnLineRef[0] >= MAX_NOTES_PER_LINE) {
-            sb.append("\n")
-            notesOnLineRef[0] = 0
+        // 限制 j 不超过 trackEnd
+        if (j > trackEnd) { j = trackEnd }
+
+        // 输出: <delta> <hex bytes>
+        sb.append("${delta}")
+        var k = eventStart
+        while (k < j) {
+            sb.append(" ${byteToHex(data[k])}")
+            k++
         }
-
-        i = groupEnd
+        sb.append("\n")
     }
-
-    if (notesOnLineRef[0] > 0) { sb.append("\n") }
-}
-
-// 格式化单个轨道（通道、乐器、力度、音符）
-func formatTrack(sb: StringBuilder, track: DecodedTrack,
-                 trackIdx: Int64, isMultiTrack: Bool, tpq: UInt16): Unit {
-    if (isMultiTrack) {
-        sb.append("\nTRACK track${trackIdx + 1}\n")
-    }
-
-    // 输出 MIDI 通道（仅非默认情况）
-    if (track.channel >= 0) {
-        sb.append("CHANNEL ${track.channel}\n")
-    }
-
-    let instrName = if (track.instrument >= 0) {
-        programToInstrument(track.instrument)
-    } else { "piano" }
-    sb.append("INSTRUMENT ${instrName}\n")
-
-    if (track.avgVelocity != DEC_DEFAULT_VELOCITY) {
-        sb.append("VELOCITY ${track.avgVelocity}\n")
-    }
-
-    formatNotes(sb, track.notes, tpq)
 }
 
 // ── 反编译主函数 ──
 
-// MIDI 文件字节数组 → 文本乐谱
+// MIDI 文件字节数组 → 无损原始事件文本（MIDI_RAW 格式）
+// 保留所有 MIDI 事件（包括 Running Status），确保重新编码后二进制完全一致
 public func decompile(data: Array<UInt8>): String {
     if (data.size < 14) {
         return "// Error: Invalid MIDI file (too short)\n"
@@ -136,12 +105,15 @@ public func decompile(data: Array<UInt8>): String {
         return "// Error: Invalid MIDI file (bad MThd)\n"
     }
 
+    let format = Int64(decReadU16(data, 8))
     let numTracks = Int64(decReadU16(data, 10))
-    let tpq = decReadU16(data, 12)
+    let tpq = Int64(decReadU16(data, 12))
 
-    // 解码所有轨道，收集速度变化
-    let allTempoChanges = ArrayList<DecodedTempoChange>()
-    let decodedTracks = ArrayList<DecodedTrack>()
+    let sb = StringBuilder()
+    sb.append("MIDI_RAW\n")
+    sb.append("TPQ ${tpq}\n")
+    sb.append("FORMAT ${format}\n")
+
     var pos: Int64 = 14
     var ti: Int64 = 0
     while (ti < numTracks) {
@@ -154,42 +126,12 @@ public func decompile(data: Array<UInt8>): String {
         let trackStart = pos + 8
         let trackEnd = trackStart + trackLen
 
-        let result = decodeTrackData(data, trackStart, trackEnd, tpq)
-        // 收集所有速度变化
-        for (tc in result.tempoChanges) {
-            allTempoChanges.add(tc)
-        }
-        if (result.track.notes.size > 0) { decodedTracks.add(result.track) }
+        sb.append("\nTRACK\n")
+        decodeTrackRaw(sb, data, trackStart, trackEnd)
+        sb.append("TRACK_END\n")
 
         pos = trackEnd
         ti++
-    }
-
-    // 按 tick 排序速度变化
-    sortTempoChanges(allTempoChanges)
-
-    // 确定初始速度
-    let firstTempoBPM: Int64 = if (allTempoChanges.size > 0) {
-        allTempoChanges[0].bpm
-    } else { Int64(120) }
-
-    // 生成文本输出
-    let sb = StringBuilder()
-    sb.append("TEMPO ${firstTempoBPM}\n")
-
-    // 输出所有速度变化（使用绝对 tick 位置，缩放到 TPQ=480）
-    for (tc in allTempoChanges) {
-        // 跳过初始速度（已在 TEMPO 行输出）
-        if (tc.tick == 0 && tc.bpm == firstTempoBPM) { continue }
-        let scaledTick = scaleTicks(tc.tick, tpq)
-        sb.append("TEMPO_AT ${scaledTick} ${tc.bpm}\n")
-    }
-
-    let isMultiTrack = decodedTracks.size > 1
-    var trackIdx: Int64 = 0
-    while (trackIdx < decodedTracks.size) {
-        formatTrack(sb, decodedTracks[trackIdx], trackIdx, isMultiTrack, tpq)
-        trackIdx++
     }
 
     sb.toString()

@@ -12,7 +12,7 @@ import midi.decoder.*
 
 @Test
 class MidiTests {
-    // ── 测试 1: 三轨完整编曲 ──
+    // ── 测试 1: 三轨完整编曲（乐谱格式编码） ──
     @TestCase
     func twinkleVariation() {
         let input =
@@ -83,7 +83,7 @@ class MidiTests {
         @Assert(foundFSharp)
     }
 
-    // ── 测试 2: 反编译回环 ──
+    // ── 测试 2: 反编译回环（二进制完全一致） ──
     @TestCase
     func decompileRoundTrip() {
         let input =
@@ -108,25 +108,17 @@ class MidiTests {
         let midi1 = generate(input)
         @Assert(verifyMThd(midi1, 1, 3))
 
+        // 反编译应输出 MIDI_RAW 格式
         let decompiled = decompile(midi1)
-        @Assert(decompiled.contains("TEMPO"))
-        @Assert(decompiled.contains("INSTRUMENT"))
+        @Assert(decompiled.startsWith("MIDI_RAW"))
 
+        // 重新编码应产生二进制完全一致的输出
         let midi2 = generate(decompiled)
-        @Assert(verifyMThd(midi2, 1, 3))
-        @Expect(countTracks(midi1), countTracks(midi2))
-        @Assert(verifyTempo(midi2, 120))
-
-        let p1 = extractNoteOnPitches(midi1)
-        let p2 = extractNoteOnPitches(midi2)
-        @Expect(p1.size, p2.size)
-
-        let prog1 = extractProgramChanges(midi1)
-        let prog2 = extractProgramChanges(midi2)
-        @Expect(prog1.size, prog2.size)
+        @Expect(midi1.size, midi2.size)
+        verifyBinaryIdentical(midi1, midi2)
     }
 
-    // ── 测试 3: VELOCITY ──
+    // ── 测试 3: VELOCITY（乐谱格式编码） ──
     @TestCase
     func velocityControl() {
         let input =
@@ -149,11 +141,13 @@ class MidiTests {
         }
         @Assert(foundVel100)
 
+        // 反编译后重新编码应二进制一致
         let text = decompile(data)
-        @Assert(text.contains("VELOCITY"))
+        let data2 = generate(text)
+        verifyBinaryIdentical(data, data2)
     }
 
-    // ── 测试 4: 扩展乐器（含 GM 新增音色） ──
+    // ── 测试 4: 扩展乐器（乐谱格式编码 + 二进制回环） ──
     @TestCase
     func extendedInstruments() {
         let input =
@@ -180,11 +174,10 @@ class MidiTests {
         @Expect(programs[1], 58)  // tuba
         @Expect(programs[2], 42)  // cello
 
-        // 反编译后乐器名应保持一致
+        // 反编译后重新编码应二进制一致
         let text = decompile(data)
-        @Assert(text.contains("harmonica"))
-        @Assert(text.contains("tuba"))
-        @Assert(text.contains("cello"))
+        let data2 = generate(text)
+        verifyBinaryIdentical(data, data2)
     }
 
     // ── 测试 5: GM 乐器映射完整性 ──
@@ -225,25 +218,25 @@ class MidiTests {
         @Expect(programToInstrument(200), "piano")  // 越界返回默认值
     }
 
-    // ── 测试 6: 反编译外部 test.mid ──
+    // ── 测试 6: 外部 test.mid 二进制回环 ──
     @TestCase
     func decompileExternalTest1() {
         verifyExternalMid("testcase/test.mid")
     }
 
-    // ── 测试 7: 反编译外部 test2.mid ──
+    // ── 测试 7: 外部 test2.mid 二进制回环 ──
     @TestCase
     func decompileExternalTest2() {
         verifyExternalMid("testcase/test2.mid")
     }
 
-    // ── 测试 8: 反编译外部 test3.mid ──
+    // ── 测试 8: 外部 test3.mid 二进制回环 ──
     @TestCase
     func decompileExternalTest3() {
         verifyExternalMid("testcase/test3.mid")
     }
 
-    // ── 测试 9: 附点音符支持 ──
+    // ── 测试 9: 附点音符（乐谱格式编码 + 二进制回环） ──
     @TestCase
     func dottedNoteDurations() {
         let input =
@@ -253,20 +246,13 @@ class MidiTests {
         let data = generate(input)
         @Assert(verifyMThd(data, 0, 1))
 
-        // 反编译后应保留附点记号
+        // 反编译后重新编码应二进制一致
         let text = decompile(data)
-        @Assert(text.contains("4."))
-        @Assert(text.contains("8."))
-        @Assert(text.contains("2."))
-
-        // 再编码应保持音符数量一致
         let data2 = generate(text)
-        let p1 = extractNoteOnPitches(data)
-        let p2 = extractNoteOnPitches(data2)
-        @Expect(p1.size, p2.size)
+        verifyBinaryIdentical(data, data2)
     }
 
-    // ── 测试 10: 原始 tick 时值支持 ──
+    // ── 测试 10: 原始 tick 时值（乐谱格式编码 + 二进制回环） ──
     @TestCase
     func rawTickDurations() {
         let input =
@@ -279,14 +265,13 @@ class MidiTests {
         let pitches = extractNoteOnPitches(data)
         @Expect(pitches.size, 3)
 
+        // 反编译后重新编码应二进制一致
         let text = decompile(data)
-        // 原始 tick 值应保留
-        @Assert(text.contains("T216"))
-        @Assert(text.contains("T432"))
-        @Assert(text.contains("T108"))
+        let data2 = generate(text)
+        verifyBinaryIdentical(data, data2)
     }
 
-    // ── 测试 11: CHANNEL 指令和通道保持 ──
+    // ── 测试 11: CHANNEL 指令（乐谱格式编码 + 二进制回环） ──
     @TestCase
     func channelPreservation() {
         let input =
@@ -302,13 +287,13 @@ class MidiTests {
         let data = generate(input)
         @Assert(verifyMThd(data, 1, 2))
 
-        // 反编译后应保留通道信息
+        // 反编译后重新编码应二进制一致
         let text = decompile(data)
-        @Assert(text.contains("CHANNEL 1"))
-        @Assert(text.contains("CHANNEL 9"))
+        let data2 = generate(text)
+        verifyBinaryIdentical(data, data2)
     }
 
-    // ── 测试 12: TEMPO_AT 绝对速度变化 ──
+    // ── 测试 12: TEMPO_AT 绝对速度变化（乐谱格式编码 + 二进制回环） ──
     @TestCase
     func tempoAtAbsolutePositioning() {
         let input =
@@ -324,27 +309,46 @@ class MidiTests {
         @Assert(countTracks(data), 2)
         @Assert(verifyTempo(data, 120))
 
-        // 反编译应保留 TEMPO_AT
+        // 反编译后重新编码应二进制一致
         let text = decompile(data)
-        @Assert(text.contains("TEMPO_AT"))
-        @Assert(text.contains("100"))
-        @Assert(text.contains("140"))
+        let data2 = generate(text)
+        verifyBinaryIdentical(data, data2)
     }
 
-    // ── 测试 13: 速度四舍五入精度 ──
+    // ── 测试 13: 速度精度保留（反编译保留原始微秒值） ──
     @TestCase
     func tempoRoundingPrecision() {
         // 原始文件 test.mid 的速度为 857142 微秒 (≈70.0 BPM)
-        // 修复前：截断为 69 BPM，修复后：四舍五入为 70 BPM
+        // MIDI_RAW 格式保留原始十六进制字节 0D 15 86 = 857478? No: 0x0D1586 = 857478
+        // Wait: 857142 = 0x0D1506 → bytes: 0D 15 06
+        // Actually: 857142 decimal = 0xD1506 hex → bytes: 0D 15 06
         let midPath = Path("testcase/test.mid")
         if (!exists(midPath)) { return }
 
-        let text = decompile(File.readFrom(midPath))
-        // 应包含 TEMPO 70（而非修复前的 TEMPO 69）
-        @Assert(text.contains("TEMPO 70"))
+        let data = File.readFrom(midPath)
+        let text = decompile(data)
+        // MIDI_RAW 格式应包含 SetTempo 的原始字节
+        @Assert(text.startsWith("MIDI_RAW"))
+        // 反编译后重新编码应二进制一致
+        let regen = generate(text)
+        verifyBinaryIdentical(data, regen)
     }
 
-    // 辅助: 验证外部 .mid 文件反编译
+    // ── 辅助函数: 验证两个字节数组二进制完全一致 ──
+    func verifyBinaryIdentical(a: Array<UInt8>, b: Array<UInt8>) {
+        @Expect(a.size, b.size)
+        var i: Int64 = 0
+        while (i < a.size && i < b.size) {
+            if (a[i] != b[i]) {
+                println("  BINARY DIFF at byte ${i}: expected ${a[i]}, got ${b[i]}")
+                @Assert(false)
+                return
+            }
+            i++
+        }
+    }
+
+    // ── 辅助函数: 验证外部 .mid 文件的反编译+重编码二进制一致性 ──
     func verifyExternalMid(midPath: String) {
         let p = Path(midPath)
         if (!exists(p)) {
@@ -359,12 +363,11 @@ class MidiTests {
         @Assert(data[3], 0x64)  // 'd'
 
         let text = decompile(data)
-        @Assert(!text.startsWith("// Error"))
-        @Assert(text.contains("TEMPO"))
-        @Assert(text.contains("INSTRUMENT"))
+        @Assert(text.startsWith("MIDI_RAW"))
 
+        // 重新编码应产生二进制完全一致的输出
         let regen = generate(text)
-        @Assert(regen.size >= 14)
-        @Assert(countTracks(regen) > 0)
+        @Expect(data.size, regen.size)
+        verifyBinaryIdentical(data, regen)
     }
 }
