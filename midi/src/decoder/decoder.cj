@@ -22,7 +22,8 @@ func byteToHex(b: UInt8): String {
 
 // ── Running Status 检测 ──
 
-// 扫描所有轨道，检测是否有使用 Running Status 的通道事件
+// 扫描所有轨道，检测原始 MIDI 二进制是否使用了 Running Status 压缩
+// 遍历每个轨道的事件，若发现数据字节（< 0x80）出现在事件首位则判定为 Running Status
 func detectRunningStatus(data: Array<UInt8>, headerEnd: Int64, numTracks: Int64): Bool {
     var pos = headerEnd
     var ti: Int64 = 0
@@ -154,7 +155,8 @@ func decodeTrackReadable(sb: StringBuilder, data: Array<UInt8>,
     }
 }
 
-// 解码通道事件为可读文本行
+// 将通道事件解码为可读文本行并追加到 StringBuilder
+// 支持 NoteOn/NoteOff（输出音名）、ProgramChange、CC、PitchBend、Aftertouch 等
 func decodeChannelEvent(sb: StringBuilder, data: Array<UInt8>,
                         eventType: UInt8, channel: UInt8,
                         delta: UInt32, dataPos: Int64, trackEnd: Int64): Unit {
