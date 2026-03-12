@@ -19,13 +19,18 @@ let DOTTED_DURATIONS: Array<(Int64, String)> = [
     (2880, "1."), (1440, "2."), (720, "4."), (360, "8."), (180, "16."), (90, "32.")
 ]
 
+// 三连音时值：基本时值 × 2/3
+let TRIPLET_DURATIONS: Array<(Int64, String)> = [
+    (1280, "1t"), (640, "2t"), (320, "4t"), (160, "8t"), (80, "16t"), (40, "32t")
+]
+
 // 力度分组阈值：力度差异超过此值时输出新的 VELOCITY 指令
 let VELOCITY_THRESHOLD: Int64 = 15
 
 // ── 时值转换（带 15% 舍入容差） ──
 
 // 将 MIDI tick 数转换为乐谱时值标记
-// 先精确匹配标准/附点时值，再尝试 15% 模糊匹配，最后返回原始 tick 值
+// 先精确匹配标准/附点/三连音时值，再尝试 15% 模糊匹配，最后返回原始 tick 值
 func ticksToScoreDuration(ticks: UInt32, tpq: Int64): String {
     let scaled: Int64 = Int64(ticks) * 480 / tpq
 
@@ -34,6 +39,9 @@ func ticksToScoreDuration(ticks: UInt32, tpq: Int64): String {
         if (scaled == pair[0]) { return pair[1] }
     }
     for (pair in DOTTED_DURATIONS) {
+        if (scaled == pair[0]) { return pair[1] }
+    }
+    for (pair in TRIPLET_DURATIONS) {
         if (scaled == pair[0]) { return pair[1] }
     }
 
@@ -50,6 +58,14 @@ func ticksToScoreDuration(ticks: UInt32, tpq: Int64): String {
         }
     }
     for (pair in DOTTED_DURATIONS) {
+        let diff = if (scaled > pair[0]) { scaled - pair[0] } else { pair[0] - scaled }
+        let threshold = pair[0] * 15 / 100
+        if (diff <= threshold && diff < bestDist) {
+            bestDist = diff
+            bestName = pair[1]
+        }
+    }
+    for (pair in TRIPLET_DURATIONS) {
         let diff = if (scaled > pair[0]) { scaled - pair[0] } else { pair[0] - scaled }
         let threshold = pair[0] * 15 / 100
         if (diff <= threshold && diff < bestDist) {

@@ -113,7 +113,7 @@ public func decompileScore(data: Array<UInt8>): String {
 
         // Pair notes and apply IOI-based durations
         let pairedNotes = pairNotes(trackEvents)
-        applyIOIDurations(pairedNotes)
+        applyIOIDurations(pairedNotes, tpq)
 
         let controlEvents = extractControlEvents(trackEvents)
         let noteLines = groupNotesIntoChords(pairedNotes, tpq)
