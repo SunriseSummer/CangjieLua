@@ -151,7 +151,7 @@ func distToStandardDuration(ticks: UInt32, tpq: Int64): Int64 {
     let allDurations: Array<Int64> = [
         1920, 960, 480, 240, 120, 60,          // 标准时值
         2880, 1440, 720, 360, 180, 90,         // 附点时值
-        640, 320, 160, 80                       // 三连音时值
+        1280, 640, 320, 160, 80, 40            // 三连音时值
     ]
     var minDist: Int64 = Int64.Max
     for (d in allDurations) {

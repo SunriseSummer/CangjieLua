@@ -21,7 +21,7 @@ let DOTTED_DURATIONS: Array<(Int64, String)> = [
 
 // 三连音时值：基本时值 × 2/3
 let TRIPLET_DURATIONS: Array<(Int64, String)> = [
-    (1280, "2t"), (640, "4t"), (320, "8t"), (160, "16t"), (80, "32t")
+    (1280, "1t"), (640, "2t"), (320, "4t"), (160, "8t"), (80, "16t"), (40, "32t")
 ]
 
 // 力度分组阈值：力度差异超过此值时输出新的 VELOCITY 指令
