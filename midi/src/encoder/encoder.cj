@@ -30,15 +30,17 @@ func buildTrackEvents(trackData: TrackData, tempo: Int64,
     for (element in trackData.elements) {
         match (element) {
             case MusicElement.SingleNote(note) =>
-                events.add(TimedEvent(pendingDelta, MidiEvent.noteOn(channel, note.pitch, velocity)))
+                let noteVel: UInt8 = if (note.velocity > 0) { UInt8(note.velocity) } else { velocity }
+                events.add(TimedEvent(pendingDelta, MidiEvent.noteOn(channel, note.pitch, noteVel)))
                 pendingDelta = 0
                 events.add(TimedEvent(note.durationTicks, MidiEvent.noteOff(channel, note.pitch)))
 
             case MusicElement.Chord(chord) =>
+                let chordVel: UInt8 = if (chord.velocity > 0) { UInt8(chord.velocity) } else { velocity }
                 var first = true
                 for (pitch in chord.pitches) {
                     let delta = if (first) { pendingDelta } else { UInt32(0) }
-                    events.add(TimedEvent(delta, MidiEvent.noteOn(channel, pitch, velocity)))
+                    events.add(TimedEvent(delta, MidiEvent.noteOn(channel, pitch, chordVel)))
                     if (first) { pendingDelta = 0; first = false }
                 }
                 var firstOff = true
@@ -53,6 +55,14 @@ func buildTrackEvents(trackData: TrackData, tempo: Int64,
 
             case MusicElement.TempoChange(bpm) =>
                 events.add(TimedEvent(pendingDelta, MidiEvent.setTempo(UInt32(60000000 / bpm))))
+                pendingDelta = 0
+
+            case MusicElement.CC(info) =>
+                events.add(TimedEvent(pendingDelta, MidiEvent.controlChange(channel, info.controller, info.value)))
+                pendingDelta = 0
+
+            case MusicElement.PitchBend(info) =>
+                events.add(TimedEvent(pendingDelta, MidiEvent.pitchBend(channel, info.lsb, info.msb)))
                 pendingDelta = 0
         }
     }

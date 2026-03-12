@@ -1,7 +1,0 @@
-// 祝你圣诞快乐 — 乐器选择
-TEMPO 132
-INSTRUMENT music_box
-G4 4  C5 4  C5 4  D5 4
-C5 4  B4 4  A4 4  A4 4
-A4 4  D5 4  D5 4  E5 4
-D5 4  C5 4  B4 4  G4 4

@@ -11,6 +11,8 @@ public enum MidiEventKind {
     | NoteOn
     | NoteOff
     | ProgramChange
+    | ControlChange
+    | PitchBendEvent
     | SetTempo
     | EndOfTrack
 }
@@ -40,6 +42,12 @@ public class MidiEvent {
     }
     public static func programChange(channel: UInt8, program: UInt8): MidiEvent {
         MidiEvent(MidiEventKind.ProgramChange, channel, program, 0, 0)
+    }
+    public static func controlChange(channel: UInt8, ctrl: UInt8, val2: UInt8): MidiEvent {
+        MidiEvent(MidiEventKind.ControlChange, channel, ctrl, val2, 0)
+    }
+    public static func pitchBend(channel: UInt8, lsb: UInt8, msb: UInt8): MidiEvent {
+        MidiEvent(MidiEventKind.PitchBendEvent, channel, lsb, msb, 0)
     }
     public static func setTempo(microsecondsPerBeat: UInt32): MidiEvent {
         MidiEvent(MidiEventKind.SetTempo, 0,
@@ -118,6 +126,14 @@ func encodeEvent(event: MidiEvent): ArrayList<UInt8> {
         case MidiEventKind.ProgramChange =>
             result.add(0xC0 | event.channel)
             result.add(event.data1)
+        case MidiEventKind.ControlChange =>
+            result.add(0xB0 | event.channel)
+            result.add(event.data1)
+            result.add(event.data2)
+        case MidiEventKind.PitchBendEvent =>
+            result.add(0xE0 | event.channel)
+            result.add(event.data1)
+            result.add(event.data2)
         case MidiEventKind.SetTempo =>
             result.add(0xFF); result.add(0x51); result.add(0x03)
             result.add(event.data1)

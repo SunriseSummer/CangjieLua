@@ -106,7 +106,7 @@ class ScoreTests {
         }
         @Assert(foundVel100)
 
-        let text = decompile(data)
+        let text = decompileReadable(data)
         let data2 = generate(text)
         verifyBinaryIdentical(data, data2)
     }
@@ -138,7 +138,7 @@ class ScoreTests {
         @Expect(programs[1], 58)  // tuba
         @Expect(programs[2], 42)  // cello
 
-        let text = decompile(data)
+        let text = decompileReadable(data)
         let data2 = generate(text)
         verifyBinaryIdentical(data, data2)
     }
@@ -182,7 +182,7 @@ class ScoreTests {
         let data = generate(input)
         @Assert(verifyMThd(data, 0, 1))
 
-        let text = decompile(data)
+        let text = decompileReadable(data)
         let data2 = generate(text)
         verifyBinaryIdentical(data, data2)
     }
@@ -200,7 +200,7 @@ class ScoreTests {
         let pitches = extractNoteOnPitches(data)
         @Expect(pitches.size, 3)
 
-        let text = decompile(data)
+        let text = decompileReadable(data)
         let data2 = generate(text)
         verifyBinaryIdentical(data, data2)
     }
@@ -221,7 +221,7 @@ class ScoreTests {
         let data = generate(input)
         @Assert(verifyMThd(data, 1, 2))
 
-        let text = decompile(data)
+        let text = decompileReadable(data)
         let data2 = generate(text)
         verifyBinaryIdentical(data, data2)
     }
@@ -241,7 +241,7 @@ class ScoreTests {
         @Assert(countTracks(data), 2)
         @Assert(verifyTempo(data, 120))
 
-        let text = decompile(data)
+        let text = decompileReadable(data)
         let data2 = generate(text)
         verifyBinaryIdentical(data, data2)
     }

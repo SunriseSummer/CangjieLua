@@ -10,10 +10,18 @@ import std.collection.*
 public class NoteInfo {
     public var pitch: UInt8           // MIDI 音高 (0-127)
     public var durationTicks: UInt32  // 持续时间（tick 数）
+    public var velocity: Int64        // 力度 (1-127)，-1 表示使用轨道默认值
 
     public init(pitch: UInt8, durationTicks: UInt32) {
         this.pitch = pitch
         this.durationTicks = durationTicks
+        this.velocity = -1
+    }
+
+    public init(pitch: UInt8, durationTicks: UInt32, velocity: Int64) {
+        this.pitch = pitch
+        this.durationTicks = durationTicks
+        this.velocity = velocity
     }
 }
 
@@ -21,19 +29,49 @@ public class NoteInfo {
 public class ChordInfo {
     public var pitches: ArrayList<UInt8>   // 和弦内各音的 MIDI 音高
     public var durationTicks: UInt32       // 持续时间（tick 数）
+    public var velocity: Int64             // 力度 (1-127)，-1 表示使用轨道默认值
 
     public init(pitches: ArrayList<UInt8>, durationTicks: UInt32) {
         this.pitches = pitches
         this.durationTicks = durationTicks
+        this.velocity = -1
+    }
+
+    public init(pitches: ArrayList<UInt8>, durationTicks: UInt32, velocity: Int64) {
+        this.pitches = pitches
+        this.durationTicks = durationTicks
+        this.velocity = velocity
     }
 }
 
-// 音乐元素：单音、和弦、休止或速度变化
+// 控制器变化信息
+public class CCInfo {
+    public var controller: UInt8   // 控制器编号 (0-127)
+    public var value: UInt8        // 控制器值 (0-127)
+    public init(controller: UInt8, value: UInt8) {
+        this.controller = controller
+        this.value = value
+    }
+}
+
+// 弯音信息
+public class PitchBendInfo {
+    public var lsb: UInt8  // 低 7 位
+    public var msb: UInt8  // 高 7 位
+    public init(lsb: UInt8, msb: UInt8) {
+        this.lsb = lsb
+        this.msb = msb
+    }
+}
+
+// 音乐元素：单音、和弦、休止、速度变化及扩展事件
 public enum MusicElement {
     | SingleNote(NoteInfo)
     | Chord(ChordInfo)
-    | Rest(UInt32)         // 休止时长（tick 数）
-    | TempoChange(Int64)   // 内联速度变化（BPM）
+    | Rest(UInt32)              // 休止时长（tick 数）
+    | TempoChange(Int64)        // 内联速度变化（BPM）
+    | CC(CCInfo)                // 控制器变化
+    | PitchBend(PitchBendInfo)  // 弯音
 }
 
 // 轨道数据

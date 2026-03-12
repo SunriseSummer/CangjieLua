@@ -205,7 +205,7 @@ func decodeChannelEvent(sb: StringBuilder, data: Array<UInt8>,
 // MIDI 文件字节数组 → 可读事件文本（MIDI 格式）
 // 保留所有 MIDI 事件，使用人类可读的事件名和音名
 // 确保重新编码后二进制完全一致
-public func decompile(data: Array<UInt8>): String {
+public func decompileReadable(data: Array<UInt8>): String {
     if (data.size < 14) {
         return "// Error: Invalid MIDI file (too short)\n"
     }
@@ -249,8 +249,19 @@ public func decompile(data: Array<UInt8>): String {
     sb.toString()
 }
 
+// 反编译 .mid 文件 → 乐谱记谱格式文本（用户友好）
+public func decompile(data: Array<UInt8>): String {
+    decompileScore(data)
+}
+
 // 反编译 .mid 文件为文本乐谱
 public func decompileToString(midPath: String): String {
     let data = File.readFrom(Path(midPath))
     decompile(data)
+}
+
+// 反编译 .mid 文件为可读事件格式文本（无损）
+public func decompileReadableToString(midPath: String): String {
+    let data = File.readFrom(Path(midPath))
+    decompileReadable(data)
 }

@@ -39,7 +39,7 @@ class ReadableFormatTests {
         @Expect(pitches[1], 64) // E4
         @Expect(pitches[2], 67) // G4
 
-        let text = decompile(data)
+        let text = decompileReadable(data)
         let data2 = generate(text)
         verifyBinaryIdentical(data, data2)
     }
@@ -65,7 +65,7 @@ class ReadableFormatTests {
         let data = generate(input)
         @Assert(verifyMThd(data, 0, 1))
 
-        let text = decompile(data)
+        let text = decompileReadable(data)
         @Assert(text.contains("RUNNING_STATUS ON"))
         let data2 = generate(text)
         verifyBinaryIdentical(data, data2)
@@ -92,7 +92,7 @@ class ReadableFormatTests {
         let data = generate(input)
         @Assert(verifyMThd(data, 0, 1))
 
-        let text = decompile(data)
+        let text = decompileReadable(data)
         @Assert(text.contains("CC 10 64 CH 0"))
         @Assert(text.contains("CC 64 127 CH 0"))
         @Assert(text.contains("CC 64 0 CH 0"))
@@ -126,7 +126,7 @@ class ReadableFormatTests {
         @Assert(verifyMThd(data, 1, 2))
         @Assert(verifyTempo(data, 100))
 
-        let text = decompile(data)
+        let text = decompileReadable(data)
         @Assert(text.contains("META 03 50 69 61 6E 6F"))
         @Assert(text.contains("META 58 04 02 18 08"))
         @Assert(text.contains("SET_TEMPO 600000"))
@@ -167,7 +167,7 @@ class ReadableFormatTests {
         @Expect(programs[0], 0)   // piano
         @Expect(programs[1], 48)  // strings
 
-        let text = decompile(data)
+        let text = decompileReadable(data)
         let data2 = generate(text)
         verifyBinaryIdentical(data, data2)
     }
@@ -199,7 +199,7 @@ class ReadableFormatTests {
         @Expect(pitches[1], 66) // F#4
         @Expect(pitches[2], 56) // G#3
 
-        let text = decompile(data)
+        let text = decompileReadable(data)
         @Assert(text.contains("ON C#4"))
         @Assert(text.contains("ON F#4"))
         @Assert(text.contains("ON G#3"))

@@ -366,6 +366,30 @@ public func parseScore(input: String): ScoreData {
             continue
         }
 
+        if (stripped.startsWith("CC")) {
+            let parts = splitWhitespace(stripped)
+            if (parts.size >= 3) {
+                try {
+                    let ctrl = UInt8.parse(parts[1])
+                    let val2 = UInt8.parse(parts[2])
+                    currentTrack.elements.add(MusicElement.CC(CCInfo(ctrl, val2)))
+                } catch (_: Exception) {}
+            }
+            continue
+        }
+
+        if (stripped.startsWith("PITCH_BEND")) {
+            let parts = splitWhitespace(stripped)
+            if (parts.size >= 3) {
+                try {
+                    let lsb = UInt8.parse(parts[1])
+                    let msb = UInt8.parse(parts[2])
+                    currentTrack.elements.add(MusicElement.PitchBend(PitchBendInfo(lsb, msb)))
+                } catch (_: Exception) {}
+            }
+            continue
+        }
+
         if (stripped.startsWith("TRACK")) {
             let parts = splitWhitespace(stripped)
             let trackName = if (parts.size >= 2) { parts[1] } else { "track" }
