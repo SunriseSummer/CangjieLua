@@ -1,9 +1,0 @@
-// 进击的巨人 — 和弦
-TEMPO 120
-INSTRUMENT strings
-E4 16  F4 16  G4 16  A4 16  B4 16  C5 16  D5 16  E5 16
-[A2 E3 A3 C4] 4  R 8
-E4 8  A4 8  B4 8
-[D3 F3 A3 D4] 4  R 8
-E4 8  G4 8  B4 8
-[E3 G#3 B3 E4] 4
