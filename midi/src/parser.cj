@@ -36,11 +36,13 @@ public enum MusicElement {
 public class TrackData {
     var name: String
     var instrument: Int64
+    var velocity: Int64
     var elements: ArrayList<MusicElement>
 
     init(name: String) {
         this.name = name
         this.instrument = -1
+        this.velocity = -1
         this.elements = ArrayList<MusicElement>()
     }
 }
@@ -101,13 +103,32 @@ func basePitch(noteRune: Rune): Int64 {
 func instrumentNumber(name: String): Int64 {
     let lower = name.toAsciiLower()
     if (lower == "piano") { return 0 }
+    if (lower == "bright_piano") { return 1 }
+    if (lower == "electric_piano") { return 4 }
     if (lower == "music_box") { return 10 }
+    if (lower == "xylophone") { return 13 }
+    if (lower == "harmonica") { return 22 }
     if (lower == "guitar") { return 24 }
+    if (lower == "acoustic_guitar") { return 25 }
+    if (lower == "steel_guitar") { return 26 }
+    if (lower == "overdriven_guitar") { return 29 }
     if (lower == "bass") { return 33 }
+    if (lower == "electric_bass") { return 34 }
     if (lower == "violin") { return 40 }
+    if (lower == "viola") { return 41 }
+    if (lower == "cello") { return 42 }
+    if (lower == "harp") { return 46 }
     if (lower == "strings") { return 48 }
+    if (lower == "ensemble") { return 49 }
+    if (lower == "voice") { return 54 }
     if (lower == "trumpet") { return 56 }
+    if (lower == "trombone") { return 57 }
+    if (lower == "horn") { return 60 }
+    if (lower == "saxophone") { return 65 }
+    if (lower == "oboe") { return 68 }
+    if (lower == "clarinet") { return 71 }
     if (lower == "flute") { return 73 }
+    if (lower == "recorder") { return 74 }
     return 0
 }
 
@@ -339,6 +360,16 @@ public func parseScore(input: String): ScoreData {
             let parts = splitWhitespace(stripped)
             if (parts.size >= 2) {
                 currentTrack.instrument = instrumentNumber(parts[1])
+            }
+            continue
+        }
+
+        if (stripped.startsWith("VELOCITY")) {
+            let parts = splitWhitespace(stripped)
+            if (parts.size >= 2) {
+                try {
+                    currentTrack.velocity = Int64.parse(parts[1])
+                } catch (_: Exception) {}
             }
             continue
         }

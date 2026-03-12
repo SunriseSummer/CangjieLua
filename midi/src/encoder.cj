@@ -50,6 +50,12 @@ func buildTrackEvents(trackData: TrackData, tempo: Int64, channel: UInt8): Array
     let events = ArrayList<TimedEvent>()
     var pendingDelta: UInt32 = 0
 
+    let velocity: UInt8 = if (trackData.velocity > 0 && trackData.velocity <= 127) {
+        UInt8(trackData.velocity)
+    } else {
+        DEFAULT_VELOCITY
+    }
+
     if (channel == 0) {
         let microsecondsPerBeat = UInt32(60000000 / tempo)
         events.add(TimedEvent(0, MidiEvent.setTempo(microsecondsPerBeat)))
@@ -62,7 +68,7 @@ func buildTrackEvents(trackData: TrackData, tempo: Int64, channel: UInt8): Array
     for (element in trackData.elements) {
         match (element) {
             case MusicElement.SingleNote(note) =>
-                events.add(TimedEvent(pendingDelta, MidiEvent.noteOn(channel, note.pitch, DEFAULT_VELOCITY)))
+                events.add(TimedEvent(pendingDelta, MidiEvent.noteOn(channel, note.pitch, velocity)))
                 pendingDelta = 0
                 events.add(TimedEvent(note.durationTicks, MidiEvent.noteOff(channel, note.pitch)))
 
@@ -70,11 +76,11 @@ func buildTrackEvents(trackData: TrackData, tempo: Int64, channel: UInt8): Array
                 var first = true
                 for (pitch in chord.pitches) {
                     if (first) {
-                        events.add(TimedEvent(pendingDelta, MidiEvent.noteOn(channel, pitch, DEFAULT_VELOCITY)))
+                        events.add(TimedEvent(pendingDelta, MidiEvent.noteOn(channel, pitch, velocity)))
                         pendingDelta = 0
                         first = false
                     } else {
-                        events.add(TimedEvent(0, MidiEvent.noteOn(channel, pitch, DEFAULT_VELOCITY)))
+                        events.add(TimedEvent(0, MidiEvent.noteOn(channel, pitch, velocity)))
                     }
                 }
                 var firstOff = true
