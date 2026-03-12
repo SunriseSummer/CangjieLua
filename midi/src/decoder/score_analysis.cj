@@ -143,21 +143,57 @@ func pairNotes(events: ArrayList<DecodedEvent>): ArrayList<PairedNote> {
 
 // ── 基于 IOI（音符间隔）的时值修正 ──
 
-// 将原始 NoteOff 时值替换为音符间隔（Inter-Onset Interval）
-// 对于顺序演奏的音符，时值变为当前音符到下一个音符的时间间隔
-// 这样可以自然地吸收小的断奏间隙，使记谱更符合乐谱习惯
-func applyIOIDurations(notes: ArrayList<PairedNote>): Unit {
+// 计算给定 tick 数到最接近标准时值的距离
+// 标准时值和附点时值基于 TPQ=480 定义
+func distToStandardDuration(ticks: UInt32, tpq: Int64): Int64 {
+    let scaled: Int64 = Int64(ticks) * 480 / tpq
+    // 标准时值表（TPQ=480 基准）
+    let allDurations: Array<Int64> = [
+        1920, 960, 480, 240, 120, 60,          // 标准时值
+        2880, 1440, 720, 360, 180, 90,         // 附点时值
+        640, 320, 160, 80                       // 三连音时值
+    ]
+    var minDist: Int64 = Int64.Max
+    for (d in allDurations) {
+        let diff = if (scaled > d) { scaled - d } else { d - scaled }
+        if (diff < minDist) { minDist = diff }
+    }
+    minDist
+}
+
+// 智能时值修正：仅在 IOI 能产生更接近标准时值的结果时才替换原始时值
+// 对于同时开始的音符（和弦成员），保持原始时值不变
+// 对于极短的 IOI（<最短标准时值的一半），保持原始时值不变
+// 这样既能吸收演奏表情中的微小断奏间隙，又不会破坏原始节奏
+func applyIOIDurations(notes: ArrayList<PairedNote>, tpq: Int64): Unit {
     if (notes.size <= 1) { return }
+    // 最短标准时值的一半（三十二分音符/2 = 30 ticks at TPQ=480）
+    let minIOI = UInt32(30 * tpq / 480)
     var i: Int64 = 0
     while (i < notes.size - 1) {
         let curr = notes[i]
         let next = notes[i + 1]
-        if (next.startTick > curr.startTick) {
-            let ioi = next.startTick - curr.startTick
-            let origEnd = curr.startTick + curr.durationTicks
-            // 当下一个音符在当前音符结束前或附近开始时使用 IOI
-            let gap = if (next.startTick > origEnd) { next.startTick - origEnd } else { UInt32(0) }
-            if (gap < curr.durationTicks / 2) {
+        // 跳过同时开始的音符（和弦成员）
+        if (next.startTick == curr.startTick) {
+            i++
+            continue
+        }
+        let ioi = next.startTick - curr.startTick
+        // 跳过极短的 IOI
+        // 这些通常是快速琶音或装饰音，不应改变前一个音符的时值
+        if (ioi < minIOI) {
+            i++
+            continue
+        }
+        let origEnd = curr.startTick + curr.durationTicks
+        let gap = if (next.startTick > origEnd) { next.startTick - origEnd } else { UInt32(0) }
+        // 仅在间隙较小（音符间有短暂断开或轻微重叠）时考虑 IOI 替换
+        if (gap < curr.durationTicks / 4) {
+            // 比较原始时值和 IOI 哪个更接近标准时值
+            let origDist = distToStandardDuration(curr.durationTicks, tpq)
+            let ioiDist = distToStandardDuration(ioi, tpq)
+            // 仅当 IOI 产生更好的标准时值匹配时才替换
+            if (ioiDist < origDist) {
                 curr.durationTicks = ioi
             }
         }

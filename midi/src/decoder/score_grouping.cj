@@ -43,39 +43,24 @@ func groupNotesIntoChords(notes: ArrayList<PairedNote>, tpq: Int64): ArrayList<S
             lines.add(ScoreLine.NoteLine(note))
             currentTick = note.startTick + note.durationTicks
         } else {
-            // 多个音符：检查时值是否一致（和弦判定）
-            var allSameDuration = true
-            var ki = i + 1
-            while (ki < j) {
-                if (notes[ki].durationTicks != note.durationTicks) {
-                    allSameDuration = false
-                    break
+            // 多个音符同时开始：统一为和弦
+            // 时值不同时使用最短时值，保证同时发声的音符不被拆分为顺序播放
+            let chordNotes = ArrayList<PairedNote>()
+            var minDur = note.durationTicks
+            var ci = i
+            while (ci < j) {
+                chordNotes.add(notes[ci])
+                if (notes[ci].durationTicks < minDur) {
+                    minDur = notes[ci].durationTicks
                 }
-                ki++
+                ci++
             }
-
-            if (allSameDuration) {
-                // 时值相同：合并为和弦
-                let chordNotes = ArrayList<PairedNote>()
-                var ci = i
-                while (ci < j) {
-                    chordNotes.add(notes[ci])
-                    ci++
-                }
-                lines.add(ScoreLine.ChordLine(chordNotes))
-                currentTick = note.startTick + note.durationTicks
-            } else {
-                // 时值不同：拆分为独立音符行
-                var ci = i
-                while (ci < j) {
-                    lines.add(ScoreLine.NoteLine(notes[ci]))
-                    let endTick = notes[ci].startTick + notes[ci].durationTicks
-                    if (endTick > currentTick) {
-                        currentTick = endTick
-                    }
-                    ci++
-                }
+            // 统一使用最短时值
+            for (cn in chordNotes) {
+                cn.durationTicks = minDur
             }
+            lines.add(ScoreLine.ChordLine(chordNotes))
+            currentTick = note.startTick + minDur
         }
 
         i = j
