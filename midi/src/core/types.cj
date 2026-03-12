@@ -1,0 +1,62 @@
+package midi.core
+
+import std.collection.*
+
+// ============================================================
+// 乐谱数据模型 — 文本乐谱解析后的中间表示
+// ============================================================
+
+// 单音符信息
+public class NoteInfo {
+    public var pitch: UInt8           // MIDI 音高 (0-127)
+    public var durationTicks: UInt32  // 持续时间（tick 数）
+
+    public init(pitch: UInt8, durationTicks: UInt32) {
+        this.pitch = pitch
+        this.durationTicks = durationTicks
+    }
+}
+
+// 和弦信息（多个音符同时发声）
+public class ChordInfo {
+    public var pitches: ArrayList<UInt8>   // 和弦内各音的 MIDI 音高
+    public var durationTicks: UInt32       // 持续时间（tick 数）
+
+    public init(pitches: ArrayList<UInt8>, durationTicks: UInt32) {
+        this.pitches = pitches
+        this.durationTicks = durationTicks
+    }
+}
+
+// 音乐元素：单音、和弦或休止
+public enum MusicElement {
+    | SingleNote(NoteInfo)
+    | Chord(ChordInfo)
+    | Rest(UInt32)         // 休止时长（tick 数）
+}
+
+// 轨道数据
+public class TrackData {
+    public var name: String                       // 轨道名称
+    public var instrument: Int64                  // GM 乐器编号，-1 表示未设置
+    public var velocity: Int64                    // 力度 (1-127)，-1 表示使用默认值
+    public var elements: ArrayList<MusicElement>  // 音乐元素序列
+
+    public init(name: String) {
+        this.name = name
+        this.instrument = -1
+        this.velocity = -1
+        this.elements = ArrayList<MusicElement>()
+    }
+}
+
+// 乐谱数据：包含速度和多轨道信息
+public class ScoreData {
+    public var tempo: Int64                   // BPM 速度
+    public var tracks: ArrayList<TrackData>   // 轨道列表
+
+    public init() {
+        this.tempo = 120
+        this.tracks = ArrayList<TrackData>()
+    }
+}

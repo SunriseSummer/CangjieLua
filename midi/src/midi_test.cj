@@ -2,6 +2,9 @@ package midi
 
 import std.collection.*
 import std.fs.*
+import midi.core.*
+import midi.encoder.*
+import midi.decoder.*
 
 // ============================================================
 // MIDI 音乐生成器 — 单元测试 (std.unittest)
@@ -150,7 +153,7 @@ class MidiTests {
         @Assert(text.contains("VELOCITY"))
     }
 
-    // ── 测试 4: 扩展乐器 ──
+    // ── 测试 4: 扩展乐器（含 GM 新增音色） ──
     @TestCase
     func extendedInstruments() {
         let input =
@@ -161,7 +164,7 @@ class MidiTests {
             "C4 4  E4 4  G4 4  C5 4\n" +
             "\n" +
             "TRACK t2\n" +
-            "INSTRUMENT steel_guitar\n" +
+            "INSTRUMENT tuba\n" +
             "C3 2  G3 2\n" +
             "\n" +
             "TRACK t3\n" +
@@ -174,28 +177,67 @@ class MidiTests {
         let programs = extractProgramChanges(data)
         @Assert(programs.size >= 3)
         @Expect(programs[0], 22)  // harmonica
-        @Expect(programs[1], 26)  // steel_guitar
+        @Expect(programs[1], 58)  // tuba
         @Expect(programs[2], 42)  // cello
 
+        // 反编译后乐器名应保持一致
         let text = decompile(data)
         @Assert(text.contains("harmonica"))
-        @Assert(text.contains("steel_guitar"))
+        @Assert(text.contains("tuba"))
         @Assert(text.contains("cello"))
     }
 
-    // ── 测试 5: 反编译外部 test.mid ──
+    // ── 测试 5: GM 乐器映射完整性 ──
+    @TestCase
+    func gmInstrumentMapping() {
+        // 验证各 GM 乐器族代表乐器的编号映射
+        @Expect(instrumentNumber("piano"), 0)
+        @Expect(instrumentNumber("harpsichord"), 6)
+        @Expect(instrumentNumber("glockenspiel"), 9)
+        @Expect(instrumentNumber("church_organ"), 19)
+        @Expect(instrumentNumber("guitar"), 24)
+        @Expect(instrumentNumber("bass"), 33)
+        @Expect(instrumentNumber("violin"), 40)
+        @Expect(instrumentNumber("trumpet"), 56)
+        @Expect(instrumentNumber("tuba"), 58)
+        @Expect(instrumentNumber("saxophone"), 65)
+        @Expect(instrumentNumber("flute"), 73)
+        @Expect(instrumentNumber("sitar"), 104)
+        @Expect(instrumentNumber("steel_drums"), 114)
+        @Expect(instrumentNumber("gunshot"), 127)
+
+        // 验证常用别名
+        @Expect(instrumentNumber("steel_guitar"), 25)
+        @Expect(instrumentNumber("french_horn"), 60)
+        @Expect(instrumentNumber("alto_sax"), 65)
+        @Expect(instrumentNumber("acoustic_grand_piano"), 0)
+
+        // 未知乐器返回 0 (piano)
+        @Expect(instrumentNumber("unknown"), 0)
+
+        // 验证 GM 数组完整性（128 项）
+        @Expect(GM_INSTRUMENTS.size, 128)
+
+        // 验证反向映射
+        @Expect(programToInstrument(0), "piano")
+        @Expect(programToInstrument(58), "tuba")
+        @Expect(programToInstrument(127), "gunshot")
+        @Expect(programToInstrument(200), "piano")  // 越界返回默认值
+    }
+
+    // ── 测试 6: 反编译外部 test.mid ──
     @TestCase
     func decompileExternalTest1() {
         verifyExternalMid("testcase/test.mid")
     }
 
-    // ── 测试 6: 反编译外部 test2.mid ──
+    // ── 测试 7: 反编译外部 test2.mid ──
     @TestCase
     func decompileExternalTest2() {
         verifyExternalMid("testcase/test2.mid")
     }
 
-    // ── 测试 7: 反编译外部 test3.mid ──
+    // ── 测试 8: 反编译外部 test3.mid ──
     @TestCase
     func decompileExternalTest3() {
         verifyExternalMid("testcase/test3.mid")

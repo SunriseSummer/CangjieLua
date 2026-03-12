@@ -2,6 +2,8 @@ package midi
 
 import std.collection.*
 import std.fs.*
+import midi.encoder.*
+import midi.decoder.*
 
 // ============================================================
 // MIDI 音乐生成器 — 入口
